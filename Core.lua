@@ -16,6 +16,9 @@ local defaults = {
     minimap = { hide = false, angle = 225 },
     showNumbers = true,       -- números de cuenta atrás en el Cooldown Manager
     actionBarNumbers = true,  -- números de cuenta atrás en las barras de acción
+    styleActionBarNumbers = true,
+    actionBarFontSize = 16,
+    numberColor = { 0.95, 0.91, 0.84, 1 }, -- blanco crema del texto "RUSCUU" del logo
 }
 
 -- Rellena los valores que falten sin pisar los que el jugador ya cambió
@@ -57,6 +60,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
         end
     elseif event == "PLAYER_LOGIN" then
         ns.ApplyActionBarNumbers()
+        ns.HookActionBars()
         ns.HookViewers()
     else
         -- Al cambiar de zona o especialización Blizzard rehace los iconos

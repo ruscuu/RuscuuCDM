@@ -107,6 +107,7 @@ local function SkinItem(item, db)
         for _, region in ipairs({ cd:GetRegions() }) do
             if region:IsObjectType("FontString") then
                 region:SetFont(db.font, db.fontSize, "OUTLINE")
+                region:SetTextColor(unpack(db.numberColor))
             end
         end
     end

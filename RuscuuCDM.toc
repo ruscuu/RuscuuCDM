@@ -12,4 +12,5 @@
 Core.lua
 Skin.lua
 Minimap.lua
+ActionBars.lua
 Options.lua

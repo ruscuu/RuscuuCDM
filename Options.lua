@@ -76,6 +76,7 @@ local function ColorSwatch(label, x, y, color)
         color[1], color[2], color[3] = r, g, bl
         fill:SetColorTexture(r, g, bl)
         ns.SkinAll()
+        ns.StyleActionBars()
     end
 
     b:SetScript("OnClick", function()
@@ -152,12 +153,30 @@ local function Build()
             db.showNumbers = checked
             ns.SkinAll()
         end)
+    ColorSwatch("Color de los números", 340, y, db.numberColor)
     y = y - 28
     Checkbox("Mostrar números en las barras de acción", 16, y,
         function() return db.actionBarNumbers end,
         function(checked)
             db.actionBarNumbers = checked
             ns.ApplyActionBarNumbers()
+        end)
+    Slider("Tamaño de los números en barras de acción", 340, y - 8, 8, 30, 1, "%d",
+        function() return db.actionBarFontSize end,
+        function(v)
+            db.actionBarFontSize = v
+            ns.StyleActionBars()
+        end)
+    y = y - 28
+    Checkbox("Estilo Ruscuu en los números de las barras de acción", 16, y,
+        function() return db.styleActionBarNumbers end,
+        function(checked)
+            db.styleActionBarNumbers = checked
+            if checked then
+                ns.StyleActionBars()
+            else
+                ns.Print("Escribe /reload para volver a los números de Blizzard.")
+            end
         end)
 end
 
