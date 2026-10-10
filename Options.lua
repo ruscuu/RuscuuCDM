@@ -138,6 +138,23 @@ local function Build()
     Checkbox("Mostrar botón en el minimapa", 16, y,
         function() return not db.minimap.hide end,
         function(checked) ns.SetMinimapShown(checked) end)
+
+    y = y - 40
+    Label("Números de cooldown", "GameFontNormalLarge", 16, y)
+    y = y - 24
+    Checkbox("Mostrar números en el Cooldown Manager", 16, y,
+        function() return db.showNumbers end,
+        function(checked)
+            db.showNumbers = checked
+            ns.SkinAll()
+        end)
+    y = y - 28
+    Checkbox("Mostrar números en las barras de acción", 16, y,
+        function() return db.actionBarNumbers end,
+        function(checked)
+            db.actionBarNumbers = checked
+            ns.ApplyActionBarNumbers()
+        end)
 end
 
 function ns.RegisterOptions()

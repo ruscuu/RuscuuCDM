@@ -14,6 +14,8 @@ local defaults = {
     borderColor = { 0.61, 0.30, 1.00, 1 }, -- morado neón (ojos y corona del logo)
     barColor = { 0.55, 0.25, 0.95, 1 },
     minimap = { hide = false, angle = 225 },
+    showNumbers = true,       -- números de cuenta atrás en el Cooldown Manager
+    actionBarNumbers = true,  -- números de cuenta atrás en las barras de acción
 }
 
 -- Rellena los valores que falten sin pisar los que el jugador ya cambió
@@ -30,6 +32,11 @@ end
 
 function ns.Print(msg)
     print("|cff9b4dffRuscuu CDM|r: " .. msg)
+end
+
+-- Opción nativa de WoW que dibuja los segundos restantes en los botones de acción
+function ns.ApplyActionBarNumbers()
+    SetCVar("countdownForCooldowns", ns.db.actionBarNumbers and "1" or "0")
 end
 
 local events = CreateFrame("Frame")
@@ -49,6 +56,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
             ns.HookViewers()
         end
     elseif event == "PLAYER_LOGIN" then
+        ns.ApplyActionBarNumbers()
         ns.HookViewers()
     else
         -- Al cambiar de zona o especialización Blizzard rehace los iconos

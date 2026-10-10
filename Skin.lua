@@ -102,6 +102,8 @@ local function SkinItem(item, db)
     local cd = item.Cooldown
     if cd then
         if cd.SetSwipeColor then cd:SetSwipeColor(0, 0, 0, 0.75) end
+        -- El juego calcula y dibuja los números; el addon solo decide si se muestran
+        if cd.SetHideCountdownNumbers then cd:SetHideCountdownNumbers(not db.showNumbers) end
         for _, region in ipairs({ cd:GetRegions() }) do
             if region:IsObjectType("FontString") then
                 region:SetFont(db.font, db.fontSize, "OUTLINE")
