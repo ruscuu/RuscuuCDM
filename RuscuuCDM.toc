@@ -6,6 +6,8 @@
 ## Author: Ruscuu
 ## Version: @project-version@
 ## IconTexture: Interface\AddOns\RuscuuCDM\Media\icon
+## X-Curse-Project-ID: 1736628
+## X-License: MIT
 ## SavedVariables: RuscuuCDMDB
 ## AddonCompartmentFunc: RuscuuCDM_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: RuscuuCDM_OnAddonCompartmentEnter
