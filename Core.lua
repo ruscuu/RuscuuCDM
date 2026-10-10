@@ -32,6 +32,8 @@ ns.LIMITS = {
 }
 
 local GLOBAL_DEFAULTS = {
+    autoEnableCDM = true,  -- activar el Cooldown Manager de Blizzard al entrar
+    cdmWarned = false,     -- ya se avisó de que no se pudo activar automáticamente
     minimap = { hide = false, angle = 225 },
     profiles = {},
     chars = {},
@@ -66,6 +68,29 @@ function ns.ApplyActionBarNumbers()
     SetCVar("countdownForCooldowns", ns.db.actionBarNumbers and "1" or "0")
 end
 
+-- Ajuste del juego que enciende el Cooldown Manager (Opciones > Opciones avanzadas)
+local CDM_CVAR = "cooldownViewerEnabled"
+
+-- Solo lo enciende; si el jugador desactiva la opción, el addon deja de tocarlo
+function ns.EnableCooldownManager()
+    if not ns.global.autoEnableCDM then return end
+    local value = C_CVar.GetCVar(CDM_CVAR)
+    if value == nil then
+        -- Esta versión del juego no tiene ese ajuste: se avisa una sola vez
+        if not ns.global.cdmWarned then
+            ns.global.cdmWarned = true
+            ns.Print(L["Could not enable the Cooldown Manager automatically: enable it in Options > Advanced Options."])
+        end
+    elseif value ~= "1" then
+        C_CVar.SetCVar(CDM_CVAR, "1")
+        ns.Print(L["Blizzard's Cooldown Manager has been enabled."])
+    end
+end
+
+function ns.DebugCooldownManager()
+    ns.Print(L["Cooldown Manager setting (%s): %s"]:format(CDM_CVAR, tostring(C_CVar.GetCVar(CDM_CVAR))))
+end
+
 -- Las versiones 0.1.x guardaban el estilo directamente en RuscuuCDMDB: se mueve al perfil Default
 local function Migrate(db)
     if db.profiles then return end
@@ -97,6 +122,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
         end
     elseif event == "PLAYER_LOGIN" then
         -- Primero los enganches, para que un fallo al cargar el perfil no los deje sin hacer
+        ns.EnableCooldownManager()
         ns.HookActionBars()
         ns.HookViewers()
         ns.SetProfile(ns.ProfileForSpec(GetSpecialization()))
@@ -122,6 +148,7 @@ SlashCmdList.RUSCUUCDM = function(msg)
     elseif msg == "debug" then
         ns.Debug()
         ns.DebugActionBars()
+        ns.DebugCooldownManager()
         ns.Print(L["Active profile: %s"]:format(ns.activeProfile))
     elseif msg == "minimap" then
         ns.SetMinimapShown(ns.global.minimap.hide)

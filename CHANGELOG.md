@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.1
+
+- New option (on by default): **enable Blizzard's Cooldown Manager automatically** when you log in.
+- More reliable action bar number styling.
+
 ## v0.3.0
 
 - **English and Spanish** — the addon follows the game language (esES/esMX → Spanish, everything else → English).

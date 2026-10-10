@@ -183,6 +183,12 @@ local function BuildMain(panel)
     local y = -164
     Label(panel, L["Apply style to"], "GameFontNormalLarge", 16, y)
     y = y - 24
+    Checkbox(panel, L["Enable Blizzard's Cooldown Manager automatically"], 340, y,
+        function() return ns.global.autoEnableCDM end,
+        function(checked)
+            ns.global.autoEnableCDM = checked
+            ns.EnableCooldownManager()
+        end)
     for _, entry in ipairs(ns.VIEWERS) do
         Checkbox(panel, entry.label, 16, y,
             function() return ns.db.enabled[entry.key] end,
