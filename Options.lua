@@ -133,6 +133,11 @@ local function Build()
     y = y - 60
     ColorSwatch("Color del borde", 16, y, db.borderColor)
     ColorSwatch("Color de las barras", 340, y, db.barColor)
+
+    y = y - 40
+    Checkbox("Mostrar botón en el minimapa", 16, y,
+        function() return not db.minimap.hide end,
+        function(checked) ns.SetMinimapShown(checked) end)
 end
 
 function ns.RegisterOptions()

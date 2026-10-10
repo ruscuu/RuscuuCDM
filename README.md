@@ -17,4 +17,5 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 | `/ruscuu` o `/rcdm` | Abre el panel de opciones |
 | `/ruscuu skin` | Reaplica el estilo |
 | `/ruscuu debug` | Muestra qué visores de Blizzard se encontraron |
+| `/ruscuu minimap` | Muestra u oculta el botón del minimapa |
 | `/ruscuu reset` | Restaura la configuración por defecto |

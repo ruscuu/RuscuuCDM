@@ -13,6 +13,7 @@ local defaults = {
     font = "Fonts\\FRIZQT__.TTF",
     borderColor = { 0.61, 0.30, 1.00, 1 }, -- morado neón (ojos y corona del logo)
     barColor = { 0.55, 0.25, 0.95, 1 },
+    minimap = { hide = false, angle = 225 },
 }
 
 -- Rellena los valores que falten sin pisar los que el jugador ya cambió
@@ -42,6 +43,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
             RuscuuCDMDB = RuscuuCDMDB or {}
             ApplyDefaults(RuscuuCDMDB, defaults)
             ns.db = RuscuuCDMDB
+            ns.CreateMinimapButton()
             ns.RegisterOptions()
         elseif arg1 == "Blizzard_CooldownViewer" and ns.db then
             ns.HookViewers()
@@ -66,6 +68,9 @@ SlashCmdList.RUSCUUCDM = function(msg)
         ns.Print("Estilo reaplicado.")
     elseif msg == "debug" then
         ns.Debug()
+    elseif msg == "minimap" then
+        ns.SetMinimapShown(ns.db.minimap.hide)
+        ns.Print(ns.db.minimap.hide and "Botón del minimapa oculto." or "Botón del minimapa visible.")
     else
         ns.OpenOptions()
     end

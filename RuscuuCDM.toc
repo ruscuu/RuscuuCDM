@@ -5,7 +5,11 @@
 ## Version: 0.1.0
 ## IconTexture: Interface\AddOns\RuscuuCDM\Media\icon
 ## SavedVariables: RuscuuCDMDB
+## AddonCompartmentFunc: RuscuuCDM_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: RuscuuCDM_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: RuscuuCDM_OnAddonCompartmentLeave
 
 Core.lua
 Skin.lua
+Minimap.lua
 Options.lua
