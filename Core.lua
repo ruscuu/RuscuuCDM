@@ -40,6 +40,7 @@ local GLOBAL_DEFAULTS = {
     autoEnableCDM = true,  -- activar el Cooldown Manager de Blizzard la primera vez
     cdmAutoDone = false,   -- ya se activó una vez: a partir de ahí se respeta lo que elija el jugador
     cdmWarned = false,     -- ya se avisó de que no se pudo activar automáticamente
+    gcdFilter = true,      -- ocultar el borde dorado en cooldowns de 1,6 s o menos
     minimap = { hide = false, angle = 225 },
     profiles = {},
     chars = {},
@@ -160,6 +161,8 @@ SlashCmdList.RUSCUUCDM = function(msg)
         ns.DebugCooldownManager()
         ns.DebugExpire()
         ns.Print(L["Active profile: %s"]:format(ns.activeProfile))
+    elseif msg == "gcd" then
+        ns.ToggleGcdFilter()
     elseif msg == "minimap" then
         ns.SetMinimapShown(ns.global.minimap.hide)
         ns.Print(ns.global.minimap.hide and L["Minimap button hidden."] or L["Minimap button shown."])

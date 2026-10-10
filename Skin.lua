@@ -135,6 +135,7 @@ local gcdGateWorks = true -- se desactiva si el juego no acepta ese valor en Set
 local expireTracked = {}  -- frame -> { tex, getDuration, border }
 local expireBroken = false
 local durationsFound = 0
+local lastAlpha, lastGate  -- últimos valores devueltos por el juego (para /ruscuu debug)
 
 -- Transparente con 0 s (habilidad lista), del color elegido hasta N s, transparente a partir de ahí
 function ns.RebuildExpireCurve()
@@ -252,16 +253,22 @@ local function UpdateExpireEntry(entry)
     durationsFound = durationsFound + 1
     local color = duration:EvaluateRemainingDuration(expireCurve)
     local r, g, b, a = color:GetRGBA()
+    lastAlpha = a
     local f, inner = entry.border, entry.border.inner
     for _, edge in ipairs(inner.edges) do edge:SetVertexColor(r, g, b, a) end
     inner.glow:SetVertexColor(r, g, b, a)
 
     -- Cooldowns de 1,6 s o menos (cooldown global) no muestran el borde; el juego decide sin revelar la duración
-    if gcdCurve and gcdGateWorks and duration.EvaluateTotalDuration then
-        if not pcall(function() f:SetAlpha(duration:EvaluateTotalDuration(gcdCurve)) end) then
+    if ns.global.gcdFilter and gcdCurve and gcdGateWorks and duration.EvaluateTotalDuration then
+        if not pcall(function()
+            lastGate = duration:EvaluateTotalDuration(gcdCurve)
+            f:SetAlpha(lastGate)
+        end) then
             gcdGateWorks = false
             f:SetAlpha(1)
         end
+    else
+        f:SetAlpha(1)
     end
 
     f:Show()
@@ -306,12 +313,25 @@ function ns.UpdateExpire()
     for owner, entry in pairs(expireTracked) do LayoutExpireBorder(entry, owner) end
 end
 
+-- Muestra un valor del juego, o "secreto" si el juego no deja leerlo
+local function Describe(value)
+    if value == nil then return "-" end
+    if issecretvalue and issecretvalue(value) then return L["secret"] end
+    return tostring(value)
+end
+
+function ns.ToggleGcdFilter()
+    ns.global.gcdFilter = not ns.global.gcdFilter
+    ns.Print(ns.global.gcdFilter and L["GCD filter on."] or L["GCD filter off."])
+end
+
 function ns.DebugExpire()
     local count = 0
     for _ in pairs(expireTracked) do count = count + 1 end
     local api = (C_CurveUtil and C_CurveUtil.CreateColorCurve) and L["yes"] or L["no"]
     ns.Print(L["Golden border: curve API %s, buttons %d, cooldowns read %d"]:format(api, count, durationsFound)
-        .. ", GCD " .. ((gcdCurve and gcdGateWorks) and L["yes"] or L["no"])
+        .. ", GCD " .. ((ns.global.gcdFilter and gcdCurve and gcdGateWorks) and L["yes"] or L["no"])
+        .. " (alpha " .. Describe(lastAlpha) .. ", gcd " .. Describe(lastGate) .. ")"
         .. (expireBroken and " |cffff5555(" .. L["disabled"] .. ")|r" or ""))
 end
 
