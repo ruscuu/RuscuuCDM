@@ -130,6 +130,8 @@ end
 ------------------------------------------------------------------------
 
 local expireCurve
+local gcdCurve            -- 0 si el cooldown dura 1,6 s o menos (cooldown global), 1 si dura más
+local gcdGateWorks = true -- se desactiva si el juego no acepta ese valor en SetAlpha
 local expireTracked = {}  -- frame -> { tex, getDuration, border }
 local expireBroken = false
 local durationsFound = 0
@@ -151,47 +153,69 @@ function ns.RebuildExpireCurve()
         return c
     end)
     if ok then expireCurve = curve end
+
+    -- Por si el juego no admite ignorar el cooldown global: los cooldowns cortos no muestran el borde
+    gcdCurve = nil
+    if C_CurveUtil.CreateCurve then
+        local gateOk, gate = pcall(function()
+            local c = C_CurveUtil.CreateCurve()
+            c:AddPoint(0, 0)
+            c:AddPoint(1.6, 0)
+            c:AddPoint(1.65, 1)
+            c:AddPoint(86400, 1)
+            return c
+        end)
+        if gateOk then gcdCurve = gate end
+    end
 end
 
 local function LayoutExpireBorder(entry, owner)
     if not entry.border then
+        -- Marco exterior: su transparencia filtra el cooldown global (curva gcdCurve)
         local f = CreateFrame("Frame", nil, owner)
-        f.edges = {}
+        -- Marco interior: lleva el borde, el resplandor y la animación de parpadeo
+        local inner = CreateFrame("Frame", nil, f)
+        inner:SetAllPoints(f)
+        inner.edges = {}
         for i = 1, 4 do
-            f.edges[i] = f:CreateTexture(nil, "OVERLAY", nil, 7)
-            f.edges[i]:SetTexture(WHITE)
-            f.edges[i]:SetVertexColor(0, 0, 0, 0)
+            inner.edges[i] = inner:CreateTexture(nil, "OVERLAY", nil, 7)
+            inner.edges[i]:SetTexture(WHITE)
+            inner.edges[i]:SetVertexColor(0, 0, 0, 0)
         end
         -- Resplandor suave alrededor del botón (el mismo brillo que usa Blizzard, teñido con el color elegido)
-        f.glow = f:CreateTexture(nil, "OVERLAY", nil, 6)
-        f.glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
-        f.glow:SetBlendMode("ADD")
-        f.glow:SetVertexColor(0, 0, 0, 0)
-        -- Parpadeo: anima la transparencia del marco entero; la curva sigue decidiendo si el borde se ve
-        f.blink = f:CreateAnimationGroup()
-        f.blink:SetLooping("BOUNCE")
-        local fade = f.blink:CreateAnimation("Alpha")
+        inner.glow = inner:CreateTexture(nil, "OVERLAY", nil, 6)
+        inner.glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+        inner.glow:SetBlendMode("ADD")
+        inner.glow:SetVertexColor(0, 0, 0, 0)
+        -- Pulso suave: anima la transparencia; la curva sigue decidiendo si el borde se ve
+        inner.blink = inner:CreateAnimationGroup()
+        inner.blink:SetLooping("BOUNCE")
+        local fade = inner.blink:CreateAnimation("Alpha")
         fade:SetFromAlpha(1)
-        fade:SetToAlpha(0.15)
-        fade:SetDuration(0.35)
+        fade:SetToAlpha(0.25)
+        fade:SetDuration(0.45)
         fade:SetSmoothing("IN_OUT")
+        f.inner = inner
         f:Hide()
         entry.border = f
     end
     local f = entry.border
+    local inner = f.inner
     local s = math.max(ns.db.borderSize, 1) + 2 -- bastante más grueso que el borde normal para que se vea bien
     local size = entry.tex:GetWidth()
     if not size or size <= 0 then size = 36 end
-    local glow = math.floor(size * 0.36 + 0.5)
-    f.glow:ClearAllPoints()
-    f.glow:SetPoint("TOPLEFT", entry.tex, "TOPLEFT", -glow, glow)
-    f.glow:SetPoint("BOTTOMRIGHT", entry.tex, "BOTTOMRIGHT", glow, -glow)
+    -- El resplandor sobresale poco para no invadir los botones de al lado
+    local glow = math.floor(size * 0.18 + 0.5)
+    inner.glow:ClearAllPoints()
+    inner.glow:SetPoint("TOPLEFT", entry.tex, "TOPLEFT", -glow, glow)
+    inner.glow:SetPoint("BOTTOMRIGHT", entry.tex, "BOTTOMRIGHT", glow, -glow)
     f:SetFrameLevel(owner:GetFrameLevel() + 5)
+    inner:SetFrameLevel(f:GetFrameLevel())
     f:ClearAllPoints()
     f:SetPoint("TOPLEFT", entry.tex, "TOPLEFT", -s, s)
     f:SetPoint("BOTTOMRIGHT", entry.tex, "BOTTOMRIGHT", s, -s)
-    local top, bottom, left, right = unpack(f.edges)
-    for _, edge in ipairs(f.edges) do edge:ClearAllPoints() end
+    local top, bottom, left, right = unpack(inner.edges)
+    for _, edge in ipairs(inner.edges) do edge:ClearAllPoints() end
     top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(s)
     bottom:SetPoint("BOTTOMLEFT"); bottom:SetPoint("BOTTOMRIGHT"); bottom:SetHeight(s)
     left:SetPoint("TOPLEFT"); left:SetPoint("BOTTOMLEFT"); left:SetWidth(s)
@@ -228,15 +252,24 @@ local function UpdateExpireEntry(entry)
     durationsFound = durationsFound + 1
     local color = duration:EvaluateRemainingDuration(expireCurve)
     local r, g, b, a = color:GetRGBA()
-    local f = entry.border
-    for _, edge in ipairs(f.edges) do edge:SetVertexColor(r, g, b, a) end
-    f.glow:SetVertexColor(r, g, b, a)
+    local f, inner = entry.border, entry.border.inner
+    for _, edge in ipairs(inner.edges) do edge:SetVertexColor(r, g, b, a) end
+    inner.glow:SetVertexColor(r, g, b, a)
+
+    -- Cooldowns de 1,6 s o menos (cooldown global) no muestran el borde; el juego decide sin revelar la duración
+    if gcdCurve and gcdGateWorks and duration.EvaluateTotalDuration then
+        if not pcall(function() f:SetAlpha(duration:EvaluateTotalDuration(gcdCurve)) end) then
+            gcdGateWorks = false
+            f:SetAlpha(1)
+        end
+    end
+
     f:Show()
     if ns.db.expireBlink then
-        if not f.blink:IsPlaying() then f.blink:Play() end
-    elseif f.blink:IsPlaying() then
-        f.blink:Stop()
-        f:SetAlpha(1)
+        if not inner.blink:IsPlaying() then inner.blink:Play() end
+    elseif inner.blink:IsPlaying() then
+        inner.blink:Stop()
+        inner:SetAlpha(1)
     end
 end
 
@@ -278,6 +311,7 @@ function ns.DebugExpire()
     for _ in pairs(expireTracked) do count = count + 1 end
     local api = (C_CurveUtil and C_CurveUtil.CreateColorCurve) and L["yes"] or L["no"]
     ns.Print(L["Golden border: curve API %s, buttons %d, cooldowns read %d"]:format(api, count, durationsFound)
+        .. ", GCD " .. ((gcdCurve and gcdGateWorks) and L["yes"] or L["no"])
         .. (expireBroken and " |cffff5555(" .. L["disabled"] .. ")|r" or ""))
 end
 
