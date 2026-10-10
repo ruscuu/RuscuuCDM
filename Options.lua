@@ -102,7 +102,11 @@ local function Build()
 
     local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-    sub:SetText("Estilo para el Cooldown Manager de Blizzard. Comandos: /ruscuu, /ruscuu debug, /ruscuu reset")
+    sub:SetPoint("RIGHT", panel, "RIGHT", -16, 0)
+    sub:SetJustifyH("LEFT")
+    sub:SetWordWrap(true)
+    sub:SetText("Estilo para el Cooldown Manager de Blizzard.\n"
+        .. "|cffaaaaaaComandos: /ruscuu  ·  /ruscuu debug  ·  /ruscuu minimap  ·  /ruscuu reset|r")
 
     local y = -164
     Label("Aplicar estilo a", "GameFontNormalLarge", 16, y)
