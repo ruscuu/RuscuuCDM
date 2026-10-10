@@ -196,6 +196,9 @@ local function BuildMain(panel)
             ns.db.expireGlow = checked
             ns.UpdateExpire()
         end)
+    Checkbox(panel, L["Blink with the golden border"], 340, y - 56,
+        function() return ns.db.expireBlink end,
+        function(checked) ns.db.expireBlink = checked end)
     for _, entry in ipairs(ns.VIEWERS) do
         Checkbox(panel, entry.label, 16, y,
             function() return ns.db.enabled[entry.key] end,

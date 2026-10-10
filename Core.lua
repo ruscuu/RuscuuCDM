@@ -24,6 +24,7 @@ ns.PROFILE_DEFAULTS = {
     expireGlow = true,                     -- borde dorado cuando el cooldown está terminando
     expireSeconds = 3,
     expireColor = { 1, 0.82, 0, 1 },
+    expireBlink = true,                    -- el borde dorado parpadea
 }
 
 -- Rangos válidos (los usan las opciones y la importación)

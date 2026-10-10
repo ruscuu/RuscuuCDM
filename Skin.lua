@@ -162,11 +162,30 @@ local function LayoutExpireBorder(entry, owner)
             f.edges[i]:SetTexture(WHITE)
             f.edges[i]:SetVertexColor(0, 0, 0, 0)
         end
+        -- Resplandor suave alrededor del botón (el mismo brillo que usa Blizzard, teñido con el color elegido)
+        f.glow = f:CreateTexture(nil, "OVERLAY", nil, 6)
+        f.glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+        f.glow:SetBlendMode("ADD")
+        f.glow:SetVertexColor(0, 0, 0, 0)
+        -- Parpadeo: anima la transparencia del marco entero; la curva sigue decidiendo si el borde se ve
+        f.blink = f:CreateAnimationGroup()
+        f.blink:SetLooping("BOUNCE")
+        local fade = f.blink:CreateAnimation("Alpha")
+        fade:SetFromAlpha(1)
+        fade:SetToAlpha(0.15)
+        fade:SetDuration(0.35)
+        fade:SetSmoothing("IN_OUT")
         f:Hide()
         entry.border = f
     end
     local f = entry.border
-    local s = math.max(ns.db.borderSize, 1) + 1 -- algo más grueso que el borde normal
+    local s = math.max(ns.db.borderSize, 1) + 2 -- bastante más grueso que el borde normal para que se vea bien
+    local size = entry.tex:GetWidth()
+    if not size or size <= 0 then size = 36 end
+    local glow = math.floor(size * 0.36 + 0.5)
+    f.glow:ClearAllPoints()
+    f.glow:SetPoint("TOPLEFT", entry.tex, "TOPLEFT", -glow, glow)
+    f.glow:SetPoint("BOTTOMRIGHT", entry.tex, "BOTTOMRIGHT", glow, -glow)
     f:SetFrameLevel(owner:GetFrameLevel() + 5)
     f:ClearAllPoints()
     f:SetPoint("TOPLEFT", entry.tex, "TOPLEFT", -s, s)
@@ -209,8 +228,16 @@ local function UpdateExpireEntry(entry)
     durationsFound = durationsFound + 1
     local color = duration:EvaluateRemainingDuration(expireCurve)
     local r, g, b, a = color:GetRGBA()
-    for _, edge in ipairs(entry.border.edges) do edge:SetVertexColor(r, g, b, a) end
-    entry.border:Show()
+    local f = entry.border
+    for _, edge in ipairs(f.edges) do edge:SetVertexColor(r, g, b, a) end
+    f.glow:SetVertexColor(r, g, b, a)
+    f:Show()
+    if ns.db.expireBlink then
+        if not f.blink:IsPlaying() then f.blink:Play() end
+    elseif f.blink:IsPlaying() then
+        f.blink:Stop()
+        f:SetAlpha(1)
+    end
 end
 
 local expireDriver = CreateFrame("Frame")
