@@ -1,0 +1,28 @@
+# Empaqueta el addon y lo publica en CurseForge, Wago y GitHub Releases al crear un tag (por ejemplo v0.3.0).
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Comprobar sintaxis Lua
+        run: |
+          sudo apt-get install -y luajit
+          for f in *.lua; do luajit -bl "$f" > /dev/null; done
+
+      - uses: BigWigsMods/packager@v2

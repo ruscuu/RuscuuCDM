@@ -2,14 +2,15 @@
 -- Solo cambia la apariencia (texturas, bordes, fuentes); nunca lee datos de combate,
 -- así que respeta las restricciones de addons de Forever/Midnight.
 local _, ns = ...
+local L = ns.L
 
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 
 ns.VIEWERS = {
-    { key = "essential", frame = "EssentialCooldownViewer", label = "Cooldowns esenciales" },
-    { key = "utility",   frame = "UtilityCooldownViewer",   label = "Cooldowns de utilidad" },
-    { key = "buffIcons", frame = "BuffIconCooldownViewer",  label = "Buffs (iconos)" },
-    { key = "buffBars",  frame = "BuffBarCooldownViewer",   label = "Buffs (barras)" },
+    { key = "essential", frame = "EssentialCooldownViewer", label = L["Essential cooldowns"] },
+    { key = "utility",   frame = "UtilityCooldownViewer",   label = L["Utility cooldowns"] },
+    { key = "buffIcons", frame = "BuffIconCooldownViewer",  label = L["Buffs (icons)"] },
+    { key = "buffBars",  frame = "BuffBarCooldownViewer",   label = L["Buffs (bars)"] },
 }
 
 -- Decoraciones propias por item, en una tabla aparte para no escribir campos en frames de Blizzard
@@ -75,7 +76,7 @@ local function SkinBar(item, db, d)
         d.barBg:SetAllPoints(bar)
         d.barBorder = CreateBorder(bar, bar)
     end
-    d.barBg:SetColorTexture(unpack(ns.COLORS.bg))
+    d.barBg:SetColorTexture(unpack(db.bgColor))
     StyleBorder(d.barBorder, db)
     StyleFonts(bar, db)
 end
@@ -171,10 +172,10 @@ function ns.Debug()
     for _, entry in ipairs(ns.VIEWERS) do
         local viewer = _G[entry.frame]
         if viewer then
-            ns.Print(("%s: encontrado, %d iconos, enganchado=%s"):format(
+            ns.Print(L["%s: found, %d icons, hooked=%s"]:format(
                 entry.frame, #ItemFrames(viewer), tostring(hooked[viewer] == true)))
         else
-            ns.Print(entry.frame .. ": |cffff5555no existe|r")
+            ns.Print(entry.frame .. ": |cffff5555" .. L["does not exist"] .. "|r")
         end
     end
 end

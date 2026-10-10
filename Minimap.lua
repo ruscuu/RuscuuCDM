@@ -1,5 +1,6 @@
 -- Ruscuu Cooldown Manager Forever: botón con el logo en el minimapa y entrada en el menú de addons
 local _, ns = ...
+local L = ns.L
 
 local ICON = "Interface\\AddOns\\RuscuuCDM\\Media\\minimap"
 local button
@@ -7,16 +8,16 @@ local button
 local function ShowTooltip(owner)
     GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
     GameTooltip:AddLine("|cff9b4dffRuscuu|r Cooldown Manager Forever")
-    GameTooltip:AddLine("Clic izquierdo: abrir opciones", 1, 1, 1)
-    GameTooltip:AddLine("Clic derecho: reaplicar estilo", 1, 1, 1)
-    GameTooltip:AddLine("Arrastrar: mover el botón", 1, 1, 1)
+    GameTooltip:AddLine(L["Left-click: open options"], 1, 1, 1)
+    GameTooltip:AddLine(L["Right-click: reapply style"], 1, 1, 1)
+    GameTooltip:AddLine(L["Drag: move button"], 1, 1, 1)
     GameTooltip:Show()
 end
 
 local function OnClick(mouseButton)
     if mouseButton == "RightButton" then
         ns.SkinAll()
-        ns.Print("Estilo reaplicado.")
+        ns.Print(L["Style reapplied."])
     else
         ns.OpenOptions()
     end
@@ -24,7 +25,7 @@ end
 
 -- Coloca el botón en el borde del minimapa según el ángulo guardado
 local function UpdatePosition()
-    local angle = math.rad(ns.db.minimap.angle)
+    local angle = math.rad(ns.global.minimap.angle)
     local radius = Minimap:GetWidth() / 2 + 10
     button:ClearAllPoints()
     button:SetPoint("CENTER", Minimap, "CENTER", math.cos(angle) * radius, math.sin(angle) * radius)
@@ -34,7 +35,7 @@ local function OnDragUpdate()
     local mx, my = Minimap:GetCenter()
     local cx, cy = GetCursorPosition()
     local scale = Minimap:GetEffectiveScale()
-    ns.db.minimap.angle = math.deg(math.atan2(cy / scale - my, cx / scale - mx))
+    ns.global.minimap.angle = math.deg(math.atan2(cy / scale - my, cx / scale - mx))
     UpdatePosition()
 end
 
@@ -81,11 +82,11 @@ function ns.CreateMinimapButton()
     button:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
 
     UpdatePosition()
-    button:SetShown(not ns.db.minimap.hide)
+    button:SetShown(not ns.global.minimap.hide)
 end
 
 function ns.SetMinimapShown(shown)
-    ns.db.minimap.hide = not shown
+    ns.global.minimap.hide = not shown
     if button then button:SetShown(shown) end
 end
 
