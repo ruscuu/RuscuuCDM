@@ -48,10 +48,24 @@ local function StyleCooldown(cd)
     end
 end
 
+-- Cooldown del hueco de acción del botón (ignorando el cooldown global)
+local function ButtonDuration(button)
+    local action = button.action
+    if not action and button.CalculateAction then action = button:CalculateAction() end
+    if not action or not HasAction(action) then return end
+    return C_ActionBar.GetActionCooldownDuration(action, true)
+end
+
 function ns.HookActionBars()
     for _, prefix in ipairs(BUTTON_PREFIXES) do
         for i = 1, 12 do
             local button = _G[prefix .. i]
+            local icon = button and (button.icon or button.Icon)
+            -- Mascota y posturas no usan huecos de acción normales: no llevan borde dorado
+            if icon and prefix ~= "PetActionButton" and prefix ~= "StanceButton"
+                and C_ActionBar and C_ActionBar.GetActionCooldownDuration then
+                ns.TrackExpire(button, icon, function() return ButtonDuration(button) end)
+            end
             local cd = button and (button.cooldown or button.Cooldown)
             if cd and not cooldowns[cd] then
                 cooldowns[cd] = true

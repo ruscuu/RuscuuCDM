@@ -31,7 +31,7 @@ if locale == "esES" or locale == "esMX" then
     L["Golden border time"] = "Segundos del borde dorado"
     L["Ending border color"] = "Color del borde al terminar"
     L["The golden border is not available in this game version."] = "El borde dorado no está disponible en esta versión del juego."
-    L["Golden border: curve API %s, cooldowns captured %d"] = "Borde dorado: API de curvas %s, cooldowns capturados %d"
+    L["Golden border: curve API %s, buttons %d, cooldowns read %d"] = "Borde dorado: API de curvas %s, botones %d, cooldowns leídos %d"
     L["yes"] = "sí"
     L["no"] = "no"
     L["disabled"] = "desactivado"
