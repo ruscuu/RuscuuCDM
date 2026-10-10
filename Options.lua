@@ -184,11 +184,11 @@ local function BuildMain(panel)
     local y = -164
     Label(panel, L["Apply style to"], "GameFontNormalLarge", 16, y)
     y = y - 24
-    Checkbox(panel, L["Enable Blizzard's Cooldown Manager automatically"], 340, y,
+    Checkbox(panel, L["Enable Blizzard's Cooldown Manager on install"], 340, y,
         function() return ns.global.autoEnableCDM end,
         function(checked)
             ns.global.autoEnableCDM = checked
-            ns.EnableCooldownManager()
+            ns.EnableCooldownManager(true)
         end)
     Checkbox(panel, L["Golden border when a cooldown is ending"], 340, y - 28,
         function() return ns.db.expireGlow end,

@@ -23,7 +23,7 @@ if locale == "esES" or locale == "esMX" then
     L["Type /reload to restore Blizzard's numbers."] = "Escribe /reload para volver a los números de Blizzard."
     L["Active profile: %s"] = "Perfil activo: %s"
     L["Action bar cooldowns hooked: %d"] = "Contadores de barras de acción enganchados: %d"
-    L["Enable Blizzard's Cooldown Manager automatically"] = "Activar automáticamente el Cooldown Manager de Blizzard"
+    L["Enable Blizzard's Cooldown Manager on install"] = "Activar el Cooldown Manager al instalar"
     L["Blizzard's Cooldown Manager has been enabled."] = "Se ha activado el Cooldown Manager de Blizzard."
     L["Could not enable the Cooldown Manager automatically: enable it in Options > Advanced Options."] = "No se pudo activar el Cooldown Manager automáticamente: actívalo en Opciones > Opciones avanzadas."
     L["Cooldown Manager setting (%s): %s"] = "Ajuste del Cooldown Manager (%s): %s"

@@ -36,7 +36,8 @@ ns.LIMITS = {
 }
 
 local GLOBAL_DEFAULTS = {
-    autoEnableCDM = true,  -- activar el Cooldown Manager de Blizzard al entrar
+    autoEnableCDM = true,  -- activar el Cooldown Manager de Blizzard la primera vez
+    cdmAutoDone = false,   -- ya se activó una vez: a partir de ahí se respeta lo que elija el jugador
     cdmWarned = false,     -- ya se avisó de que no se pudo activar automáticamente
     minimap = { hide = false, angle = 225 },
     profiles = {},
@@ -75,9 +76,12 @@ end
 -- Ajuste del juego que enciende el Cooldown Manager (Opciones > Opciones avanzadas)
 local CDM_CVAR = "cooldownViewerEnabled"
 
--- Solo lo enciende; si el jugador desactiva la opción, el addon deja de tocarlo
-function ns.EnableCooldownManager()
+-- Lo enciende solo una vez (al instalar o al marcar la opción con force); si el jugador lo apaga
+-- después en las opciones de Blizzard, el addon no lo vuelve a encender
+function ns.EnableCooldownManager(force)
     if not ns.global.autoEnableCDM then return end
+    if ns.global.cdmAutoDone and not force then return end
+    ns.global.cdmAutoDone = true
     local value = C_CVar.GetCVar(CDM_CVAR)
     if value == nil then
         -- Esta versión del juego no tiene ese ajuste: se avisa una sola vez
