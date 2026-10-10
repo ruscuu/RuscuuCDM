@@ -22,6 +22,7 @@ if locale == "esES" or locale == "esMX" then
     L["Type /reload to restore Blizzard's style on that viewer."] = "Escribe /reload para volver al estilo de Blizzard en ese visor."
     L["Type /reload to restore Blizzard's numbers."] = "Escribe /reload para volver a los números de Blizzard."
     L["Active profile: %s"] = "Perfil activo: %s"
+    L["Action bar cooldowns hooked: %d"] = "Contadores de barras de acción enganchados: %d"
     L["Theme applied: %s"] = "Tema aplicado: %s"
     L["Profile imported."] = "Perfil importado."
     L["Invalid import string."] = "Texto de importación no válido."

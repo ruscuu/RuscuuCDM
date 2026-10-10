@@ -96,9 +96,10 @@ events:SetScript("OnEvent", function(_, event, arg1)
             ns.HookViewers()
         end
     elseif event == "PLAYER_LOGIN" then
-        ns.SetProfile(ns.ProfileForSpec(GetSpecialization()))
+        -- Primero los enganches, para que un fallo al cargar el perfil no los deje sin hacer
         ns.HookActionBars()
         ns.HookViewers()
+        ns.SetProfile(ns.ProfileForSpec(GetSpecialization()))
     elseif event == "PLAYER_SPECIALIZATION_CHANGED" and arg1 == "player" then
         ns.SelectProfileForSpec()
         C_Timer.After(1, ns.SkinAll)
@@ -120,6 +121,7 @@ SlashCmdList.RUSCUUCDM = function(msg)
         ns.Print(L["Style reapplied."])
     elseif msg == "debug" then
         ns.Debug()
+        ns.DebugActionBars()
         ns.Print(L["Active profile: %s"]:format(ns.activeProfile))
     elseif msg == "minimap" then
         ns.SetMinimapShown(ns.global.minimap.hide)
