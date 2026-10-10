@@ -105,6 +105,7 @@ local function SkinItem(item, db)
         if cd.SetSwipeColor then cd:SetSwipeColor(0, 0, 0, 0.75) end
         -- El juego calcula y dibuja los números; el addon solo decide si se muestran
         if cd.SetHideCountdownNumbers then cd:SetHideCountdownNumbers(not db.showNumbers) end
+        ns.HookExpire(item, cd, d)
         for _, region in ipairs({ cd:GetRegions() }) do
             if region:IsObjectType("FontString") then
                 region:SetFont(db.font, db.fontSize, "OUTLINE")
@@ -121,6 +122,145 @@ local function SkinItem(item, db)
     end
 
     SkinBar(item, db, d)
+end
+
+------------------------------------------------------------------------
+-- Borde dorado cuando al cooldown le quedan pocos segundos.
+-- El addon no puede leer el tiempo restante (es un valor secreto en combate): le pasa al juego
+-- una curva de color y es el juego quien decide el color según el tiempo que queda.
+------------------------------------------------------------------------
+
+local expireCurve
+local expireActive = {}   -- item -> DurationObject del cooldown en curso
+local expireBroken = false
+local capturedDurations = 0
+
+function ns.RebuildExpireCurve()
+    expireCurve = nil
+    if expireBroken or not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return end
+    local db = ns.db
+    local r, g, b = db.expireColor[1], db.expireColor[2], db.expireColor[3]
+    local s = db.expireSeconds
+    local ok, curve = pcall(function()
+        local c = C_CurveUtil.CreateColorCurve()
+        c:AddPoint(0, CreateColor(r, g, b, 1))
+        c:AddPoint(s, CreateColor(r, g, b, 1))
+        c:AddPoint(s + 0.05, CreateColor(r, g, b, 0))
+        c:AddPoint(86400, CreateColor(r, g, b, 0))
+        return c
+    end)
+    if ok then expireCurve = curve end
+end
+
+local function ExpireBorder(item, d, tex)
+    if not d.expire then
+        local f = CreateFrame("Frame", nil, item)
+        f.edges = {}
+        for i = 1, 4 do
+            f.edges[i] = f:CreateTexture(nil, "OVERLAY")
+            f.edges[i]:SetTexture(WHITE)
+        end
+        d.expire = f
+    end
+    local f = d.expire
+    local s = math.max(ns.db.borderSize, 1) + 1 -- algo más grueso que el borde normal
+    f:SetFrameLevel(item:GetFrameLevel() + 3)
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", tex, "TOPLEFT", -s, s)
+    f:SetPoint("BOTTOMRIGHT", tex, "BOTTOMRIGHT", s, -s)
+    local top, bottom, left, right = unpack(f.edges)
+    for _, edge in ipairs(f.edges) do edge:ClearAllPoints() end
+    top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(s)
+    bottom:SetPoint("BOTTOMLEFT"); bottom:SetPoint("BOTTOMRIGHT"); bottom:SetHeight(s)
+    left:SetPoint("TOPLEFT"); left:SetPoint("BOTTOMLEFT"); left:SetWidth(s)
+    right:SetPoint("TOPRIGHT"); right:SetPoint("BOTTOMRIGHT"); right:SetWidth(s)
+    return f
+end
+
+local function StopExpire(item)
+    expireActive[item] = nil
+    local d = decor[item]
+    if d and d.expire then d.expire:Hide() end
+end
+
+local function StartExpire(item, duration)
+    local db = ns.db
+    if expireBroken or not expireCurve or not duration or not db or not db.expireGlow then return end
+    local d, tex = decor[item], IconTexture(item)
+    if not d or not tex then return end
+    local f = ExpireBorder(item, d, tex)
+    for _, edge in ipairs(f.edges) do edge:SetVertexColor(0, 0, 0, 0) end
+    f:Show()
+    expireActive[item] = duration
+    capturedDurations = capturedDurations + 1
+end
+
+-- Si la API no se comporta como esperamos, se desactiva la función en vez de llenar el chat de errores
+local function BreakExpire()
+    expireBroken = true
+    for item in pairs(expireActive) do StopExpire(item) end
+    ns.Print(L["The golden border is not available in this game version."])
+end
+
+local function UpdateExpireBorder(f, duration)
+    local color = duration:EvaluateRemainingDuration(expireCurve)
+    local r, g, b, a = color:GetRGBA()
+    for _, edge in ipairs(f.edges) do edge:SetVertexColor(r, g, b, a) end
+end
+
+local expireDriver = CreateFrame("Frame")
+local sinceUpdate = 0
+expireDriver:SetScript("OnUpdate", function(_, elapsed)
+    sinceUpdate = sinceUpdate + elapsed
+    if sinceUpdate < 0.05 or not expireCurve then return end
+    sinceUpdate = 0
+    for item, duration in pairs(expireActive) do
+        local f = decor[item] and decor[item].expire
+        if f and not pcall(UpdateExpireBorder, f, duration) then
+            BreakExpire()
+            return
+        end
+    end
+end)
+
+-- Captura el DurationObject con el que Blizzard arranca el cooldown de cada icono
+local function HookExpire(item, cd, d)
+    if d.expireHooked then return end
+    d.expireHooked = true
+    if type(cd.SetCooldownFromDurationObject) == "function" then
+        hooksecurefunc(cd, "SetCooldownFromDurationObject", function(_, duration) StartExpire(item, duration) end)
+    end
+    -- Algunos cooldowns llegan como inicio + duración: se convierten en DurationObject si el juego lo permite
+    if type(cd.SetCooldown) == "function" and C_DurationUtil and C_DurationUtil.CreateDuration then
+        hooksecurefunc(cd, "SetCooldown", function(_, start, length)
+            local ok, duration = pcall(function()
+                local dur = C_DurationUtil.CreateDuration()
+                dur:SetTimeFromStart(start, length)
+                return dur
+            end)
+            if ok then StartExpire(item, duration) end
+        end)
+    end
+    if type(cd.Clear) == "function" then
+        hooksecurefunc(cd, "Clear", function() StopExpire(item) end)
+    end
+    cd:HookScript("OnCooldownDone", function() StopExpire(item) end)
+    cd:HookScript("OnHide", function() StopExpire(item) end)
+end
+ns.HookExpire = HookExpire -- SkinItem está definido antes en el archivo
+
+-- Se llama al cambiar las opciones del borde dorado
+function ns.UpdateExpire()
+    ns.RebuildExpireCurve()
+    if not ns.db.expireGlow then
+        for item in pairs(expireActive) do StopExpire(item) end
+    end
+end
+
+function ns.DebugExpire()
+    local api = (C_CurveUtil and C_CurveUtil.CreateColorCurve) and L["yes"] or L["no"]
+    ns.Print(L["Golden border: curve API %s, cooldowns captured %d"]:format(api, capturedDurations)
+        .. (expireBroken and " |cffff5555(" .. L["disabled"] .. ")|r" or ""))
 end
 
 local function ItemFrames(viewer)

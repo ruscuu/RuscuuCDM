@@ -21,6 +21,9 @@ ns.PROFILE_DEFAULTS = {
     styleActionBarNumbers = true,
     actionBarFontSize = 16,
     numberColor = { 0.95, 0.91, 0.84, 1 }, -- blanco crema del texto "RUSCUU" del logo
+    expireGlow = true,                     -- borde dorado cuando el cooldown está terminando
+    expireSeconds = 3,
+    expireColor = { 1, 0.82, 0, 1 },
 }
 
 -- Rangos válidos (los usan las opciones y la importación)
@@ -29,6 +32,7 @@ ns.LIMITS = {
     iconZoom = { 0, 0.15 },
     fontSize = { 8, 24 },
     actionBarFontSize = { 8, 30 },
+    expireSeconds = { 1, 10 },
 }
 
 local GLOBAL_DEFAULTS = {
@@ -149,6 +153,7 @@ SlashCmdList.RUSCUUCDM = function(msg)
         ns.Debug()
         ns.DebugActionBars()
         ns.DebugCooldownManager()
+        ns.DebugExpire()
         ns.Print(L["Active profile: %s"]:format(ns.activeProfile))
     elseif msg == "minimap" then
         ns.SetMinimapShown(ns.global.minimap.hide)

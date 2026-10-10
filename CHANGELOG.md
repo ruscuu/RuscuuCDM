@@ -3,6 +3,7 @@
 ## v0.3.1
 
 - New option (on by default): **enable Blizzard's Cooldown Manager automatically** when you log in.
+- **Golden border when a cooldown is ending** (last 3 seconds by default, configurable from 1 to 10 seconds and with custom color). Uses Blizzard's color curve API, so the addon never reads the remaining time.
 - More reliable action bar number styling.
 
 ## v0.3.0

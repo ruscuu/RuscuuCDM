@@ -27,6 +27,7 @@ end
 
 -- Reaplica todo lo visual tras cambiar de perfil o de valores
 function ns.RefreshAll()
+    ns.UpdateExpire()
     ns.SkinAll()
     ns.StyleActionBars()
     ns.ApplyActionBarNumbers()

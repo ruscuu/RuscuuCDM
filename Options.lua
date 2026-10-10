@@ -119,6 +119,7 @@ local function ColorSwatch(parent, label, x, y, key)
         local c = ns.db[key]
         c[1], c[2], c[3] = r, g, bl
         refresh()
+        ns.UpdateExpire()
         ns.SkinAll()
         ns.StyleActionBars()
     end
@@ -189,6 +190,12 @@ local function BuildMain(panel)
             ns.global.autoEnableCDM = checked
             ns.EnableCooldownManager()
         end)
+    Checkbox(panel, L["Golden border when a cooldown is ending"], 340, y - 28,
+        function() return ns.db.expireGlow end,
+        function(checked)
+            ns.db.expireGlow = checked
+            ns.UpdateExpire()
+        end)
     for _, entry in ipairs(ns.VIEWERS) do
         Checkbox(panel, entry.label, 16, y,
             function() return ns.db.enabled[entry.key] end,
@@ -208,6 +215,7 @@ local function BuildMain(panel)
     Slider(panel, L["Icon crop"], 340, y, "iconZoom", 0.01, "%.2f")
     y = y - 56
     Slider(panel, L["Cooldown text size"], 16, y, "fontSize", 1, "%d")
+    Slider(panel, L["Golden border time"], 340, y, "expireSeconds", 1, "%d s", ns.UpdateExpire)
 
     y = y - 60
     ColorSwatch(panel, L["Border color"], 16, y, "borderColor")
@@ -217,6 +225,7 @@ local function BuildMain(panel)
     Checkbox(panel, L["Show minimap button"], 16, y,
         function() return not ns.global.minimap.hide end,
         function(checked) ns.SetMinimapShown(checked) end)
+    ColorSwatch(panel, L["Ending border color"], 340, y, "expireColor")
 
     y = y - 40
     Label(panel, L["Cooldown numbers"], "GameFontNormalLarge", 16, y)
