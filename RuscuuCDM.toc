@@ -1,0 +1,11 @@
+## Interface: 16001
+## Title: |cff9b4dffRuscuu|r Cooldown Manager Forever
+## Notes: Estilo visual Ruscuu para el Cooldown Manager de Blizzard.
+## Author: Ruscuu
+## Version: 0.1.0
+## IconTexture: Interface\AddOns\RuscuuCDM\Media\icon
+## SavedVariables: RuscuuCDMDB
+
+Core.lua
+Skin.lua
+Options.lua
