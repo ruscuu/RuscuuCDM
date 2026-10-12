@@ -82,6 +82,7 @@ L["Right-click: preview the golden border"] = "Clic derecho: ver el borde dorado
 L["Drag: move button"] = "Arrastrar: mover el botón"
 
 -- Panel: elementos comunes
+L["Type a value and press Enter, or use the mouse wheel over it."] = "Escribe un valor y pulsa Intro, o usa la rueda del ratón encima."
 L["Profile: %s"] = "Perfil: %s"
 L["Defaults"] = "Valores por defecto"
 L["Restores the default values of this page in the active profile."] = "Restaura los valores por defecto de esta página en el perfil activo."

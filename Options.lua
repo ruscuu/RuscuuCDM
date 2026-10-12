@@ -57,6 +57,9 @@ local function FormatOrBlizzard(v)
     return ("%d"):format(v)
 end
 
+-- Al escribir un valor se usan las unidades que se ven: 8% de recorte se guarda como 0.08
+local DISPLAY_SCALE = { [FormatPercent] = 100 }
+
 ------------------------------------------------------------------------
 -- Listas de opciones de los desplegables
 ------------------------------------------------------------------------
@@ -189,9 +192,10 @@ function Layout:Slider(col, label, key, step, display, onChange, tip)
     title:SetPoint("TOPLEFT", x, y)
     title:SetText(label)
     local limits = ns.LIMITS[key]
+    local scale = DISPLAY_SCALE[display] or 1
     local s = CreateFrame("Slider", nil, self.content, "BackdropTemplate")
     s:SetOrientation("HORIZONTAL")
-    s:SetSize(self.colWidth - 70, 12)
+    s:SetSize(self.colWidth - 92, 12)
     s:SetPoint("TOPLEFT", x, y - 22)
     s:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
     s:SetBackdropColor(unpack(ns.COLORS.bg))
@@ -205,27 +209,80 @@ function Layout:Slider(col, label, key, step, display, onChange, tip)
     s:SetObeyStepOnDrag(true)
     s:EnableMouse(true)
 
-    local value = s:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    value:SetPoint("LEFT", s, "RIGHT", 10, 0)
+    -- Cuadro con el valor: se puede escribir el número exacto (Intro) o ajustarlo con la rueda del ratón
+    local box = CreateFrame("EditBox", nil, self.content, "BackdropTemplate")
+    box:SetSize(80, 20)
+    box:SetPoint("LEFT", s, "RIGHT", 8, 0)
+    box:SetAutoFocus(false)
+    box:SetFontObject("GameFontHighlightSmall")
+    box:SetJustifyH("CENTER")
+    box:SetTextInsets(3, 3, 0, 0)
+    box:SetMaxLetters(12)
+    box:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
+    box:SetBackdropColor(0, 0, 0, 0.35)
+    box:EnableMouseWheel(true)
+    local function boxBorder(alpha) box:SetBackdropBorderColor(PURPLE[1], PURPLE[2], PURPLE[3], alpha) end
+    boxBorder(0.25)
+
+    local function round(v)
+        v = math.max(limits[1], math.min(limits[2], v))
+        return tonumber(("%.3f"):format(math.floor(v / step + 0.5) * step))
+    end
+    local function showValue()
+        if box:HasFocus() then
+            box:SetText(("%g"):format(tonumber(("%.3f"):format(ns.db[key] * scale))))
+        else
+            box:SetText(display(ns.db[key]))
+        end
+    end
+    -- Cambia el valor como si se hubiera movido el deslizador (guarda y aplica el estilo)
+    local function setValue(v)
+        v = round(v)
+        if v ~= ns.db[key] then s:SetValue(v) end
+        showValue()
+    end
 
     local refreshing = false
     local function refresh()
         refreshing = true
         s:SetValue(ns.db[key])
-        value:SetText(display(ns.db[key]))
+        showValue()
         refreshing = false
     end
     s:SetScript("OnValueChanged", function(_, v)
         if refreshing then return end
-        v = tonumber(("%.3f"):format(math.floor(v / step + 0.5) * step))
-        ns.db[key] = v
-        value:SetText(display(v))
+        ns.db[key] = round(v)
+        showValue()
         local fn = onChange or Apply
         fn()
     end)
+
+    box:SetScript("OnEditFocusGained", function()
+        boxBorder(0.9)
+        showValue()
+        box:HighlightText()
+    end)
+    box:SetScript("OnEditFocusLost", function()
+        boxBorder(0.25)
+        box:HighlightText(0, 0)
+        showValue()
+    end)
+    box:SetScript("OnEnterPressed", function()
+        -- Acepta coma o punto decimal y unidades escritas ("8%", "3,5 s")
+        local n = tonumber((box:GetText():gsub(",", ".")):match("%-?%d*%.?%d+"))
+        if n then setValue(n / scale) end
+        box:ClearFocus()
+    end)
+    box:SetScript("OnEscapePressed", function() box:ClearFocus() end)
+    box:SetScript("OnHide", function() box:ClearFocus() end)
+    box:SetScript("OnMouseWheel", function(_, delta) setValue(ns.db[key] + delta * step) end)
+    box:HookScript("OnEnter", function() if not box:HasFocus() then boxBorder(0.6) end end)
+    box:HookScript("OnLeave", function() if not box:HasFocus() then boxBorder(0.25) end end)
+
     refresh()
     OnRefresh(refresh)
     AddTooltip(s, label, tip)
+    AddTooltip(box, label, L["Type a value and press Enter, or use the mouse wheel over it."])
     return s
 end
 
