@@ -380,18 +380,17 @@ end
 -- DurationObject del cooldown y una curva de color decide el color; el addon nunca ve el tiempo.
 ------------------------------------------------------------------------
 
-local expireCurve
-local tracked = {}        -- owner -> { tex, getDuration, border, inner, edges, glow, errors }
+local expireCurve        -- cooldowns: borde dorado
+local buffCurve          -- buffs a punto de terminar
+local tracked = {}        -- owner -> { tex, getDuration, kind, border, inner, edges, glow, errors }
 local trackedCount = 0
 local reads = 0
 local testUntil = 0
 local testing = false
 
--- Transparente con 0 s (habilidad lista), del color elegido hasta N s, transparente a partir de ahí
-function ns.RebuildExpireCurve()
-    expireCurve = nil
+-- Transparente con 0 s (habilidad lista o sin buff), del color elegido hasta N s, transparente a partir de ahí
+local function BuildCurve(c, s)
     if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return end
-    local c, s = ns.db.expireColor, ns.db.expireSeconds
     local a = c[4] or 1
     local ok, curve = pcall(function()
         local cv = C_CurveUtil.CreateColorCurve()
@@ -402,7 +401,24 @@ function ns.RebuildExpireCurve()
         cv:AddPoint(86400, CreateColor(c[1], c[2], c[3], 0))
         return cv
     end)
-    if ok then expireCurve = curve end
+    if ok then return curve end
+end
+
+function ns.RebuildExpireCurve()
+    expireCurve = BuildCurve(ns.db.expireColor, ns.db.expireSeconds)
+    buffCurve = BuildCurve(ns.db.buffEndColor, ns.db.buffEndSeconds)
+end
+
+-- Curva de un borde, o nil si su tipo de aviso está desactivado
+local function EntryCurve(entry, db)
+    if entry.kind == "buff" then
+        return db.buffEndGlow and buffCurve
+    end
+    return db.expireGlow and expireCurve
+end
+
+local function EntryColor(entry, db)
+    return entry.kind == "buff" and db.buffEndColor or db.expireColor
 end
 
 local function SetExpireColor(entry, r, g, b, a)
@@ -445,7 +461,8 @@ local function LayoutExpire(entry, owner)
     right:SetPoint("TOPRIGHT"); right:SetPoint("BOTTOMRIGHT"); right:SetWidth(s)
 
     -- El brillo de Blizzard mide 62 px para un botón de 36: sobresale un 36% del icono por lado
-    local size = entry.tex:GetWidth()
+    -- Se usa el lado corto: en las barras de buffs el borde puede rodear la barra entera
+    local size = math.min(entry.tex:GetWidth() or 0, entry.tex:GetHeight() or 0)
     if not size or size <= 0 then size = 36 end
     local glow = math.floor(size * 0.36 * db.expireGlowSize / 100 + 0.5)
     entry.glow:ClearAllPoints()
@@ -456,14 +473,15 @@ end
 
 -- Registra un frame (icono del Cooldown Manager o botón de acción) para el borde dorado.
 -- getDuration devuelve el DurationObject de su cooldown, o nil si no tiene o está excluido.
-function ns.TrackExpire(owner, tex, getDuration)
+-- kind = "buff" para los buffs a punto de terminar (otra curva y otro color).
+function ns.TrackExpire(owner, tex, getDuration, kind)
     local entry = tracked[owner]
     if not entry then
         entry = { errors = 0 }
         tracked[owner] = entry
         trackedCount = trackedCount + 1
     end
-    entry.tex, entry.getDuration = tex, getDuration
+    entry.tex, entry.getDuration, entry.kind = tex, getDuration, kind
     LayoutExpire(entry, owner)
 end
 
@@ -489,14 +507,14 @@ function ns.ExpireAllowed(spellID)
     return true
 end
 
-local function UpdateEntry(entry)
+local function UpdateEntry(entry, curve)
     local duration = entry.getDuration()
     if not duration then
         entry.border:Hide()
         return
     end
     reads = reads + 1
-    local color = duration:EvaluateRemainingDuration(expireCurve)
+    local color = duration:EvaluateRemainingDuration(curve)
     SetExpireColor(entry, color:GetRGBA())
     entry.border:Show()
 end
@@ -526,11 +544,11 @@ driver:SetScript("OnUpdate", function(_, elapsed)
     local now = GetTime()
 
     if now < testUntil then
-        -- Vista previa: todos los bordes visibles con el color elegido
+        -- Vista previa: todos los bordes visibles con el color elegido (dorado o el de los buffs)
         testing = true
-        local c = db.expireColor
         for owner, entry in pairs(tracked) do
             if OwnerVisible(owner) then
+                local c = EntryColor(entry, db)
                 SetExpireColor(entry, c[1], c[2], c[3], c[4] or 1)
                 entry.border:Show()
             else
@@ -546,18 +564,17 @@ driver:SetScript("OnUpdate", function(_, elapsed)
         sinceEval = sinceEval + elapsed
         if sinceEval >= 0.1 then
             sinceEval = 0
-            if db.expireGlow and expireCurve then
-                for owner, entry in pairs(tracked) do
-                    if not entry.disabled and OwnerVisible(owner) then
-                        if not pcall(UpdateEntry, entry) then
-                            -- Un fallo aislado no apaga la función; un frame que falla siempre se ignora
-                            entry.errors = entry.errors + 1
-                            entry.border:Hide()
-                            if entry.errors >= 5 then entry.disabled = true end
-                        end
-                    else
+            for owner, entry in pairs(tracked) do
+                local curve = EntryCurve(entry, db)
+                if curve and not entry.disabled and OwnerVisible(owner) then
+                    if not pcall(UpdateEntry, entry, curve) then
+                        -- Un fallo aislado no apaga la función; un frame que falla siempre se ignora
+                        entry.errors = entry.errors + 1
                         entry.border:Hide()
+                        if entry.errors >= 5 then entry.disabled = true end
                     end
+                else
+                    entry.border:Hide()
                 end
             end
         end
@@ -579,6 +596,19 @@ local function ViewerItemDuration(item)
     return C_Spell.GetSpellCooldownDuration(spellID, true)
 end
 
+-- Duración del buff (o debuff en el objetivo) que muestra un icono o una barra de buffs.
+-- Se pide al juego por su identificador de aura; si el juego lo oculta (secreto) no hay aviso.
+local function ViewerItemAuraDuration(item)
+    if not (C_UnitAuras and C_UnitAuras.GetAuraDuration) then return end
+    local id = item.GetAuraSpellInstanceID and item:GetAuraSpellInstanceID()
+    if ns.IsSecret(id) or not id then return end
+    local unit = item.GetAuraDataUnit and item:GetAuraDataUnit() or "player"
+    if ns.IsSecret(unit) then return end
+    -- El aura puede haber terminado justo ahora: no cuenta como error
+    local ok, duration = pcall(C_UnitAuras.GetAuraDuration, unit, id)
+    if ok then return duration end
+end
+
 -- Se llama al cambiar las opciones del borde dorado (y al cambiar de perfil)
 function ns.UpdateExpire()
     ns.RebuildExpireCurve()
@@ -586,7 +616,7 @@ function ns.UpdateExpire()
         entry.errors, entry.disabled = 0, nil -- cualquier cambio vuelve a intentarlo
         LayoutExpire(entry, owner)
     end
-    if not ns.db.expireGlow then HideAllExpire() end
+    if not ns.db.expireGlow and not ns.db.buffEndGlow then HideAllExpire() end
 end
 
 function ns.TestExpire(seconds)
@@ -597,6 +627,7 @@ end
 function ns.CountExpireTracked() return trackedCount end
 function ns.CountExpireReads() return reads end
 function ns.IsExpireBroken() return not (C_CurveUtil and C_CurveUtil.CreateColorCurve) end
+function ns.HasAuraDurationAPI() return (C_UnitAuras and C_UnitAuras.GetAuraDuration) ~= nil end
 
 ------------------------------------------------------------------------
 -- Visores
@@ -649,6 +680,11 @@ function ns.SkinViewer(entry)
         local tex = IconTexture(item)
         if entry.cooldowns and on and db.expireOnCDM and tex then
             ns.TrackExpire(item, tex, function() return ViewerItemDuration(item) end)
+        elseif not entry.cooldowns and on and db.buffEndGlow and tex then
+            -- En las barras con el icono oculto el borde rodea la barra
+            local holder = IconHolder(item)
+            local anchor = (holder ~= item and not holder:IsShown() and item.Bar) or tex
+            ns.TrackExpire(item, anchor, function() return ViewerItemAuraDuration(item) end, "buff")
         else
             ns.UntrackExpire(item)
         end

@@ -511,10 +511,11 @@ local function BuildGeneral(ui)
             line(s.actionCooldowns > 0, L["Action bar cooldowns hooked: %d"]:format(s.actionCooldowns)),
             line(s.curveAPI, L["Golden border: curve API %s, buttons %d, cooldowns read %d"]:format(
                 s.curveAPI and L["yes"] or L["no"], s.expireTracked, s.expireReads)),
+            line(s.auraAPI, L["Buffs about to end: aura API %s"]:format(s.auraAPI and L["yes"] or L["no"])),
             "|cffffffff" .. L["Active profile: %s"]:format(ns.activeProfile) .. "|r",
         }, "\n"))
     end)
-    ui:Next(84)
+    ui:Next(100)
 
     ui:Section(L["Addon"])
     ui:Check(1, L["Show minimap button"],
@@ -743,6 +744,15 @@ local function BuildGoldenBorder(ui)
     ui:Slider(1, L["Speed"], "expirePulseSpeed", 0.1, FormatPerSecond)
     ui:Slider(2, L["Minimum opacity"], "expirePulseMin", 0.05, FormatPercent,
         nil, L["How much the border fades between blinks."])
+    ui:Next(48)
+
+    ui:Section(L["Buffs about to end"])
+    ui:DBCheck(1, L["Border when a buff is about to end"], "buffEndGlow",
+        L["On the Cooldown Manager's buff icons and bars, so you know when to refresh them. Uses the thickness, glow and blinking above."])
+    ui:Color(2, L["Buff border color"], "buffEndColor")
+    ui:Next(32)
+    ui:Slider(1, L["Last seconds of the buff"], "buffEndSeconds", 0.5, FormatSeconds, nil,
+        L["The border appears when this many seconds (or fewer) of the buff remain."])
     ui:Next(48)
 end
 
@@ -1102,7 +1112,8 @@ local SUBPAGES = {
         key = "golden", titleKey = "Golden border", descKey = "A pulsing border during the last seconds of a cooldown.",
         build = BuildGoldenBorder,
         resetKeys = { "expireGlow", "expireOnCDM", "expireOnActionBars", "expireSeconds", "expireColor",
-            "expireThickness", "expireGlowShow", "expireGlowSize", "expirePulse", "expirePulseSpeed", "expirePulseMin" },
+            "expireThickness", "expireGlowShow", "expireGlowSize", "expirePulse", "expirePulseSpeed", "expirePulseMin",
+            "buffEndGlow", "buffEndColor", "buffEndSeconds" },
     },
     {
         key = "spells", titleKey = "Golden border: spells", descKey = "Choose which spells get the golden border.",

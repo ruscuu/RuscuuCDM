@@ -194,6 +194,12 @@ ns.PROFILE_DEFAULTS = {
     expirePulseSpeed = 1.2,                   -- parpadeos por segundo
     expirePulseMin = 0.25,                    -- transparencia mínima del parpadeo
     expireExclude = {},                       -- [spellID] = true: hechizos sin borde dorado
+
+    -- Borde en los buffs del Cooldown Manager cuando están a punto de terminar
+    -- (usa el grosor, el resplandor y el parpadeo del borde dorado)
+    buffEndGlow = false,
+    buffEndSeconds = 5,
+    buffEndColor = { 1, 0.40, 0.10, 1 },
 }
 
 -- Rangos válidos (los usan las opciones y la importación)
@@ -210,6 +216,7 @@ ns.LIMITS = {
     expireGlowSize = { 0, 200 },
     expirePulseSpeed = { 0.2, 5 },
     expirePulseMin = { 0, 0.9 },
+    buffEndSeconds = { 1, 60 },
 }
 
 -- Valores permitidos para las opciones de lista (los usa la importación)
@@ -567,6 +574,7 @@ function ns.GetStatus()
         expireTracked = ns.CountExpireTracked(),
         expireReads = ns.CountExpireReads(),
         expireBroken = ns.IsExpireBroken(),
+        auraAPI = ns.HasAuraDurationAPI(),
     }
 end
 
@@ -583,5 +591,6 @@ function ns.Debug()
     ns.Print(L["Golden border: curve API %s, buttons %d, cooldowns read %d"]:format(
         s.curveAPI and yes or no, s.expireTracked, s.expireReads)
         .. (s.expireBroken and " |cffff5555(" .. L["disabled"] .. ")|r" or ""), true)
+    ns.Print(L["Buffs about to end: aura API %s"]:format(s.auraAPI and yes or no), true)
     ns.Print(L["Active profile: %s"]:format(ns.activeProfile), true)
 end

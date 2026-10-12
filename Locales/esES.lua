@@ -75,6 +75,7 @@ L["Viewers found: %d/%d"] = "Visores encontrados: %d/%d"
 L["Action bar cooldowns hooked: %d"] = "Contadores de barras de acción enganchados: %d"
 L["Cooldown Manager enabled: %s"] = "Cooldown Manager activado: %s"
 L["Golden border: curve API %s, buttons %d, cooldowns read %d"] = "Borde dorado: API de curvas %s, botones %d, cooldowns leídos %d"
+L["Buffs about to end: aura API %s"] = "Buffs a punto de terminar: API de auras %s"
 L["Active profile: %s"] = "Perfil activo: %s"
 
 -- Botón del minimapa
@@ -223,6 +224,13 @@ L["Blink style"] = "Tipo de parpadeo"
 L["Speed"] = "Velocidad"
 L["Minimum opacity"] = "Opacidad mínima"
 L["How much the border fades between blinks."] = "Cuánto se desvanece el borde entre parpadeos."
+
+L["Buffs about to end"] = "Buffs a punto de terminar"
+L["Border when a buff is about to end"] = "Borde cuando un buff va a terminar"
+L["On the Cooldown Manager's buff icons and bars, so you know when to refresh them. Uses the thickness, glow and blinking above."] = "En los iconos y barras de buffs del Cooldown Manager, para saber cuándo renovarlos. Usa el grosor, el resplandor y el parpadeo de arriba."
+L["Buff border color"] = "Color del borde de buffs"
+L["Last seconds of the buff"] = "Últimos segundos del buff"
+L["The border appears when this many seconds (or fewer) of the buff remain."] = "El borde aparece cuando al buff le quedan estos segundos (o menos)."
 
 -- Página Borde dorado: hechizos
 L["Uncheck the spells that should never get the golden border. The list shows the spells on your action bars and in the Cooldown Manager; the choice is saved in the active profile."] = "Desmarca los hechizos que nunca deben llevar el borde dorado. La lista muestra los hechizos de tus barras de acción y del Cooldown Manager; la elección se guarda en el perfil activo."
