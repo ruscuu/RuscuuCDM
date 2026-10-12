@@ -185,6 +185,32 @@ function M.ExpireBorder(owner)
     return border._shown and color ~= nil and color[4] > 0.5, color
 end
 
+-- Selector de color con la misma lógica que el de Blizzard: Aceptar llama a swatchFunc y opacityFunc
+-- y después se cierra; Cancelar llama a cancelFunc y se cierra. Si esas funciones fallan, no se cierra.
+function M.InstallColorPicker()
+    local picker = M.CreateFrame("Frame", "ColorPickerFrame")
+    picker:Hide()
+    picker.rgb, picker.alpha = { 1, 1, 1 }, 1
+    function picker:GetColorRGB() return unpack(self.rgb) end
+    function picker:GetColorAlpha() return self.alpha end
+    function picker:SetupColorPickerAndShow(info)
+        self.swatchFunc, self.opacityFunc, self.cancelFunc = info.swatchFunc, info.opacityFunc, info.cancelFunc
+        self.previousValues = { r = info.r, g = info.g, b = info.b, a = info.opacity }
+        self.rgb, self.alpha = { info.r, info.g, info.b }, info.opacity
+        self:Show()
+    end
+    function picker:ClickOkay()
+        self.swatchFunc()
+        if self.opacityFunc then self.opacityFunc() end
+        self:Hide()
+    end
+    function picker:ClickCancel()
+        if self.cancelFunc then self.cancelFunc(self.previousValues) end
+        self:Hide()
+    end
+    return picker
+end
+
 -- El frame que actualiza los bordes en cada fotograma (OnUpdate sin padre, creado por Skin.lua)
 function M.Tick(seconds)
     seconds = seconds or 0.2
@@ -197,6 +223,7 @@ end
 function M.install()
     _G.SlashCmdList, _G.StaticPopupDialogs, _G.UISpecialFrames = {}, {}, {}
     _G.GetLocale = function() return "enUS" end
+    _G.geterrorhandler = function() return function(err) error(err, 0) end end
     _G.CreateFrame = M.CreateFrame
     _G.CreateFont = function(name) local f = M.CreateFrame("Font", name); return f end
     _G.hooksecurefunc = function(t, method, fn)

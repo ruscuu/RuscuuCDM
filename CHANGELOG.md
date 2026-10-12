@@ -10,10 +10,12 @@
 - **Type exact values** in the sliders, or use the mouse wheel over the value.
 - **Square minimaps** (Leatrix Plus, SexyMap…): the minimap button follows the square edge.
 - **New languages**: German, French, Portuguese and Russian.
+- **Reload UI** button on every options page.
 
 **Fixed**
 - The first time you opened an options page after logging in or `/reload`, it was blank until you went to another page and came back.
 - The global cooldown no longer lights up the golden border on every button when you cast a spell.
+- The color picker could stay open after Accept or Cancel. Now it always closes, and if something fails the error is shown in the chat.
 
 ## v0.4.0
 

@@ -85,6 +85,9 @@ L["Right-click: preview the golden border"] = "Clic droit : aperçu de la bordur
 L["Drag: move button"] = "Glisser : déplacer le bouton"
 
 -- Panel: elementos comunes
+L["Reload UI"] = "Recharger l’IU"
+L["Reloads the game interface, like /reload. Most changes apply instantly; the language needs a reload."] = "Recharge l’interface du jeu, comme /reload. La plupart des changements s’appliquent immédiatement ; la langue nécessite un rechargement."
+L["Something went wrong: %s"] = "Une erreur s’est produite : %s"
 L["This page could not be shown because of an error. Please report it:"] = "Cette page n’a pas pu s’afficher à cause d’une erreur. Merci de signaler ce texte :"
 L["Type a value and press Enter, or use the mouse wheel over it."] = "Saisissez une valeur et appuyez sur Entrée, ou utilisez la molette de la souris dessus."
 L["Profile: %s"] = "Profil : %s"
@@ -133,7 +136,6 @@ L["Informative messages such as profile switches or applied themes. Warnings are
 L["Language"] = "Langue"
 L["Automatic (game language)"] = "Automatique (langue du jeu)"
 L["The addon follows the game language by default. Changing it requires reloading the interface."] = "Par défaut, l’addon utilise la langue du jeu. Pour la changer, il faut recharger l’interface."
-L["Reload interface"] = "Recharger l’interface"
 L["Reset everything"] = "Tout réinitialiser"
 L["Deletes all profiles and settings of the addon and reloads the interface."] = "Supprime tous les profils et réglages de l’addon et recharge l’interface."
 

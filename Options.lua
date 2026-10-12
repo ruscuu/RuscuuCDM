@@ -19,10 +19,21 @@ local function OnRefresh(fn)
 end
 
 -- Aplica el estilo tras cambiar una opción
-local function Apply()
+local function ApplyStyle()
     ns.UpdateExpire()
     ns.SkinAll()
     ns.StyleActionBars()
+end
+
+-- Un error al aplicar no debe romper el control que lo llamó (por ejemplo, el selector de color de Blizzard
+-- no se cierra si su función falla): se avisa en el chat y el panel sigue funcionando
+local function SafeCall(fn, ...)
+    local ok, err = pcall(fn, ...)
+    if not ok then ns.ReportError(err) end
+end
+
+local function Apply()
+    SafeCall(ApplyStyle)
 end
 
 local function PlayClick(on)
@@ -189,8 +200,7 @@ function Layout:DBCheck(col, label, key, tip, onChange)
         function() return ns.db[key] end,
         function(on)
             ns.db[key] = on
-            local fn = onChange or Apply
-            fn()
+            SafeCall(onChange or ApplyStyle)
         end, tip)
 end
 
@@ -262,8 +272,7 @@ function Layout:Slider(col, label, key, step, display, onChange, tip)
         if refreshing then return end
         ns.db[key] = round(v)
         showValue()
-        local fn = onChange or Apply
-        fn()
+        SafeCall(onChange or ApplyStyle)
     end)
 
     box:SetScript("OnEditFocusGained", function()
@@ -318,8 +327,7 @@ function Layout:Color(col, label, key, onChange, tip)
         local c = ns.db[key]
         c[1], c[2], c[3], c[4] = r, g, bl, a
         refresh()
-        local fn = onChange or Apply
-        fn()
+        SafeCall(onChange or ApplyStyle)
     end
     b:SetScript("OnClick", function()
         local c = ns.db[key]
@@ -372,8 +380,7 @@ function Layout:DBChoice(col, label, key, getOptions, tip, onChange)
         function() return ns.db[key] end,
         function(value)
             ns.db[key] = value
-            local fn = onChange or Apply
-            fn()
+            SafeCall(onChange or ApplyStyle)
         end, tip)
 end
 
@@ -411,7 +418,6 @@ local function BuildHeader(panel)
 
     local desc = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
-    desc:SetPoint("RIGHT", panel, "RIGHT", -180, 0)
     desc:SetJustifyH("LEFT")
     desc:SetTextColor(0.78, 0.78, 0.78)
     desc:SetText(L[panel.descKey])
@@ -420,16 +426,27 @@ local function BuildHeader(panel)
     chip:SetPoint("TOPRIGHT", -16, -12)
     OnRefresh(function() chip:SetText(L["Profile: %s"]:format("|cff9b4dff" .. ns.activeProfile .. "|r")) end)
 
+    -- Botones a la derecha: Valores por defecto (si la página tiene) y Recargar IU (en todas)
+    local rightEdge = -16
     if panel.resetKeys then
         local reset = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-        reset:SetSize(160, 22)
-        reset:SetPoint("TOPRIGHT", -16, -30)
+        reset:SetSize(150, 22)
+        reset:SetPoint("TOPRIGHT", rightEdge, -30)
         reset:SetText(L["Defaults"])
         reset:SetScript("OnClick", function()
             ns.ShowPopup("RUSCUUCDM_RESET_KEYS", L[panel.titleKey], nil, panel.resetKeys)
         end)
         AddTooltip(reset, L["Defaults"], L["Restores the default values of this page in the active profile."])
+        rightEdge = rightEdge - 150 - 6
     end
+    local reload = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    reload:SetSize(120, 22)
+    reload:SetPoint("TOPRIGHT", rightEdge, -30)
+    reload:SetText(L["Reload UI"])
+    reload:SetScript("OnClick", function() ReloadUI() end)
+    AddTooltip(reload, L["Reload UI"],
+        L["Reloads the game interface, like /reload. Most changes apply instantly; the language needs a reload."])
+    desc:SetPoint("RIGHT", panel, "RIGHT", rightEdge - 120 - 8, 0)
 
     local line = panel:CreateTexture(nil, "ARTWORK")
     line:SetColorTexture(PURPLE[1], PURPLE[2], PURPLE[3], 0.6)
@@ -550,7 +567,6 @@ local function BuildGeneral(ui)
             ns.Print(L["The language will change when you reload the interface."], true)
         end,
         L["The addon follows the game language by default. Changing it requires reloading the interface."])
-    ui:Button(2, L["Reload interface"], 200, function() ReloadUI() end, nil)
     ui:Next(56)
 
     ui:Section(L["Commands"])

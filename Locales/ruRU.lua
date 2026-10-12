@@ -85,6 +85,9 @@ L["Right-click: preview the golden border"] = "ПКМ: показать золо
 L["Drag: move button"] = "Перетаскивание: переместить кнопку"
 
 -- Panel: elementos comunes
+L["Reload UI"] = "Перезагрузить UI"
+L["Reloads the game interface, like /reload. Most changes apply instantly; the language needs a reload."] = "Перезагружает интерфейс игры, как /reload. Большинство изменений применяются сразу; для смены языка нужна перезагрузка."
+L["Something went wrong: %s"] = "Что-то пошло не так: %s"
 L["This page could not be shown because of an error. Please report it:"] = "Не удалось показать эту страницу из-за ошибки. Пожалуйста, сообщите этот текст:"
 L["Type a value and press Enter, or use the mouse wheel over it."] = "Введите значение и нажмите Enter или прокрутите колесо мыши над полем."
 L["Profile: %s"] = "Профиль: %s"
@@ -133,7 +136,6 @@ L["Informative messages such as profile switches or applied themes. Warnings are
 L["Language"] = "Язык"
 L["Automatic (game language)"] = "Автоматически (язык игры)"
 L["The addon follows the game language by default. Changing it requires reloading the interface."] = "По умолчанию аддон использует язык игры. Чтобы сменить язык, нужно перезагрузить интерфейс."
-L["Reload interface"] = "Перезагрузить интерфейс"
 L["Reset everything"] = "Сбросить всё"
 L["Deletes all profiles and settings of the addon and reloads the interface."] = "Удаляет все профили и настройки аддона и перезагружает интерфейс."
 

@@ -274,6 +274,17 @@ function ns.Print(msg, important)
     print("|cff9b4dffRuscuu CDM|r: " .. msg)
 end
 
+-- Errores del addon: se escriben en el chat (una vez cada uno) aunque el juego oculte los errores de Lua,
+-- para que el jugador pueda copiarlos, y se pasan al gestor de errores del juego (BugSack, scriptErrors)
+local reportedErrors = {}
+function ns.ReportError(err)
+    local message = tostring(err)
+    if reportedErrors[message] then return end
+    reportedErrors[message] = true
+    ns.Print(L["Something went wrong: %s"]:format(message), true)
+    geterrorhandler()(err)
+end
+
 function ns.IsSecret(value)
     return issecretvalue ~= nil and issecretvalue(value) == true
 end
