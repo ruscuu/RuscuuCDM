@@ -164,6 +164,13 @@ ns.PROFILE_DEFAULTS = {
     countColor = { 1, 1, 1, 1 },
     barTextSize = 0,                          -- nombre y duración de las barras; 0 = tamaño de Blizzard
 
+    -- Atajos de teclado sobre los iconos de cooldowns
+    showKeybinds = true,
+    keybindSize = 12,
+    keybindOutline = "OUTLINE",
+    keybindColor = { 0.95, 0.91, 0.84, 1 },
+    keybindAnchor = "TOPRIGHT",               -- esquina del icono: TOPLEFT | TOPRIGHT | BOTTOMLEFT | BOTTOMRIGHT
+
     -- Números de las barras de acción
     styleActionBarNumbers = true,
     actionBarFontSize = 16,
@@ -196,6 +203,7 @@ ns.LIMITS = {
     fontSize = { 6, 40 },
     countSize = { 0, 32 },
     barTextSize = { 0, 24 },
+    keybindSize = { 6, 24 },
     actionBarFontSize = { 6, 40 },
     expireSeconds = { 0.5, 30 },
     expireThickness = { 1, 8 },
@@ -211,6 +219,8 @@ ns.CHOICES = {
     numberOutline = { NONE = true, OUTLINE = true, THICKOUTLINE = true, MONOCHROME = true },
     countOutline = { NONE = true, OUTLINE = true, THICKOUTLINE = true, MONOCHROME = true },
     actionBarNumberOutline = { NONE = true, OUTLINE = true, THICKOUTLINE = true, MONOCHROME = true },
+    keybindOutline = { NONE = true, OUTLINE = true, THICKOUTLINE = true, MONOCHROME = true },
+    keybindAnchor = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true },
     expirePulse = { none = true, pulse = true, flash = true },
 }
 

@@ -323,6 +323,58 @@ local function UnskinItem(item)
 end
 
 ------------------------------------------------------------------------
+-- Atajo de teclado sobre los iconos de cooldowns (la tecla la busca ActionBars.lua)
+------------------------------------------------------------------------
+
+local KEYBIND_OFFSETS = { TOPLEFT = { 2, -2 }, TOPRIGHT = { -2, -2 }, BOTTOMLEFT = { 2, 2 }, BOTTOMRIGHT = { -2, 2 } }
+
+function ns.StyleKeybindText(fs, anchorTo, db)
+    ns.SetFontSafe(fs, db.font, db.keybindSize, ns.OutlineFlags(db.keybindOutline))
+    local c = db.keybindColor
+    fs:SetTextColor(c[1], c[2], c[3], c[4] or 1)
+    local anchor = KEYBIND_OFFSETS[db.keybindAnchor] and db.keybindAnchor or "TOPRIGHT"
+    local offset = KEYBIND_OFFSETS[anchor]
+    fs:ClearAllPoints()
+    fs:SetPoint(anchor, anchorTo, anchor, offset[1], offset[2])
+end
+
+-- Tecla del hechizo del icono; si el juego oculta el hechizo (en combate) se conserva la última
+local function ItemHotkey(item, d)
+    local base = item.GetBaseSpellID and item:GetBaseSpellID()
+    local spell = item.GetSpellID and item:GetSpellID()
+    if ns.IsSecret(base) or ns.IsSecret(spell) then return d.keyText end
+    if not ns.GetSpellHotkey then return end
+    return ns.GetSpellHotkey(base) or ns.GetSpellHotkey(spell)
+end
+
+local function LayoutKeybind(item, show)
+    local d = decor[item]
+    if not show then
+        if d and d.keyFrame then d.keyFrame:Hide() end
+        return
+    end
+    local tex = IconTexture(item)
+    if not tex then return end
+    if not d then
+        d = {}
+        decor[item] = d
+    end
+    if not d.keyFrame then
+        -- Frame propio por encima del barrido y del borde dorado
+        d.keyFrame = CreateFrame("Frame", nil, item)
+        d.keyLabel = d.keyFrame:CreateFontString(nil, "OVERLAY")
+    end
+    local f = d.keyFrame
+    f:ClearAllPoints()
+    f:SetAllPoints(tex)
+    f:SetFrameLevel(item:GetFrameLevel() + 7)
+    ns.StyleKeybindText(d.keyLabel, f, ns.db)
+    d.keyText = ItemHotkey(item, d)
+    d.keyLabel:SetText(d.keyText or "")
+    f:SetShown(d.keyText ~= nil)
+end
+
+------------------------------------------------------------------------
 -- Borde dorado cuando al cooldown le quedan pocos segundos.
 -- El addon no puede leer el tiempo restante (es un valor secreto en combate): pide al juego el
 -- DurationObject del cooldown y una curva de color decide el color; el addon nunca ve el tiempo.
@@ -593,11 +645,25 @@ function ns.SkinViewer(entry)
     local on = db.enabled[entry.key]
     for _, item in ipairs(ItemFrames(viewer)) do
         if on then SkinItem(item, db) else UnskinItem(item) end
+        if entry.cooldowns then LayoutKeybind(item, on and db.showKeybinds) end
         local tex = IconTexture(item)
         if entry.cooldowns and on and db.expireOnCDM and tex then
             ns.TrackExpire(item, tex, function() return ViewerItemDuration(item) end)
         else
             ns.UntrackExpire(item)
+        end
+    end
+end
+
+-- Se llama cuando cambian las teclas o lo que hay en las barras
+function ns.RefreshKeybinds()
+    local db = ns.db
+    if not db then return end
+    for _, entry in ipairs(ns.VIEWERS) do
+        local viewer = entry.cooldowns and _G[entry.frame]
+        if viewer then
+            local show = db.enabled[entry.key] and db.showKeybinds
+            for _, item in ipairs(ItemFrames(viewer)) do LayoutKeybind(item, show) end
         end
     end
 end
@@ -666,9 +732,9 @@ end
 
 local previews = {}
 local PREVIEW_ICONS = {
-    { icon = "Interface\\Icons\\Spell_Frost_FrostNova", duration = 12, count = "2" },
-    { icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", duration = 30 },
-    { icon = "Interface\\Icons\\Ability_Warrior_Charge" },
+    { icon = "Interface\\Icons\\Spell_Frost_FrostNova", duration = 12, count = "2", key = "1" },
+    { icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", duration = 30, key = "Q" },
+    { icon = "Interface\\Icons\\Ability_Warrior_Charge", key = "s-E" },
 }
 
 -- Muestra cómo quedan los iconos, la barra, los números y el borde dorado con los ajustes actuales
@@ -708,6 +774,12 @@ function ns.CreatePreview(parent)
             -- El borde dorado de la vista previa usa el mismo sistema que los botones reales
             ns.TrackExpire(holder, tex, function() return holder.durationObject end)
         end
+        local keyFrame = CreateFrame("Frame", nil, holder)
+        keyFrame:SetAllPoints(tex)
+        keyFrame:SetFrameLevel(holder:GetFrameLevel() + 7)
+        holder.keyFrame = keyFrame
+        holder.key = keyFrame:CreateFontString(nil, "OVERLAY")
+        holder.key:SetText(info.key)
         if info.count then
             holder.count = holder:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
             holder.count:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -770,6 +842,8 @@ function ns.RefreshPreview(p)
         if holder.count then
             ns.StyleText(holder.count, db.countSize, db.countOutline, db.countUseColor and db.countColor or nil)
         end
+        ns.StyleKeybindText(holder.key, holder.keyFrame, db)
+        holder.keyFrame:SetShown(db.showKeybinds)
     end
     local bar = p.bar
     bar:SetStatusBarTexture(ns.ResolveBarTexture(db.barTexture) or WHITE)

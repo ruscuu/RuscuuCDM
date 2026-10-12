@@ -64,6 +64,15 @@ local DISPLAY_SCALE = { [FormatPercent] = 100 }
 -- Listas de opciones de los desplegables
 ------------------------------------------------------------------------
 
+local function KeybindAnchorOptions()
+    return {
+        { value = "TOPLEFT", text = L["Top left"] },
+        { value = "TOPRIGHT", text = L["Top right"] },
+        { value = "BOTTOMLEFT", text = L["Bottom left"] },
+        { value = "BOTTOMRIGHT", text = L["Bottom right"] },
+    }
+end
+
 local function OutlineOptions()
     local list = {}
     for _, o in ipairs(ns.OUTLINES) do list[#list + 1] = { value = o.key, text = L[o.nameKey] } end
@@ -637,6 +646,17 @@ local function BuildTexts(ui)
     ui:Color(2, L["Charges color"], "countColor")
     ui:Next(32)
 
+    ui:Section(L["Keybinds"])
+    ui:DBCheck(1, L["Show keybinds"], "showKeybinds",
+        L["Shows on each Cooldown Manager icon the key that casts it, taken from your action bars."])
+    ui:Color(2, L["Keybind color"], "keybindColor")
+    ui:Next(32)
+    ui:Slider(1, L["Keybind size"], "keybindSize", 1, FormatNumber)
+    ui:DBChoice(2, L["Outline"], "keybindOutline", OutlineOptions)
+    ui:Next(56)
+    ui:DBChoice(1, L["Position"], "keybindAnchor", KeybindAnchorOptions)
+    ui:Next(56)
+
     ui:Section(L["Buff bar texts"])
     ui:Slider(1, L["Name and duration size"], "barTextSize", 1, FormatOrBlizzard, nil, L["0 keeps Blizzard's size."])
     ui:Next(48)
@@ -1066,10 +1086,11 @@ local SUBPAGES = {
             "showSwipe", "swipeColor", "cooldownEdge", "cooldownBling", "barTexture", "barColor", "barClassColor", "bgColor" },
     },
     {
-        key = "texts", titleKey = "Texts and numbers", descKey = "Font, countdown numbers, charges and bar texts.",
+        key = "texts", titleKey = "Texts and numbers", descKey = "Font, countdown numbers, charges, keybinds and bar texts.",
         build = BuildTexts,
         resetKeys = { "font", "showNumbers", "fontSize", "numberOutline", "numberColor", "countSize",
-            "countOutline", "countUseColor", "countColor", "barTextSize" },
+            "countOutline", "countUseColor", "countColor", "showKeybinds", "keybindSize", "keybindOutline",
+            "keybindColor", "keybindAnchor", "barTextSize" },
     },
     {
         key = "actionbars", titleKey = "Action bars", descKey = "Cooldown numbers on your action buttons.",

@@ -234,3 +234,134 @@ function ns.GetActionBarSpells()
     end
     return list
 end
+
+------------------------------------------------------------------------
+-- Atajos de teclado: qué tecla lanza cada hechizo, para mostrarla en el Cooldown Manager.
+-- Solo se lee la configuración de teclas y de barras (nunca datos de combate), y fuera de combate.
+------------------------------------------------------------------------
+
+-- Huecos de las barras de Blizzard -> comando de tecla. Sirve también para barras que no están a la
+-- vista: las habilidades de forma de gato o de sigilo van en la barra principal solo en esa forma
+local SLOT_COMMANDS = {
+    { first = 1, last = 12, command = "ACTIONBUTTON" },
+    { first = 25, last = 36, command = "MULTIACTIONBAR3BUTTON" },
+    { first = 37, last = 48, command = "MULTIACTIONBAR4BUTTON" },
+    { first = 49, last = 60, command = "MULTIACTIONBAR2BUTTON" },
+    { first = 61, last = 72, command = "MULTIACTIONBAR1BUTTON" },
+    { first = 73, last = 120, command = "ACTIONBUTTON" }, -- barras de forma, postura y sigilo
+    { first = 145, last = 156, command = "MULTIACTIONBAR5BUTTON" },
+    { first = 157, last = 168, command = "MULTIACTIONBAR6BUTTON" },
+    { first = 169, last = 180, command = "MULTIACTIONBAR7BUTTON" },
+}
+
+local hotkeyBySpell = {}
+local hotkeysDirty = true
+local rebuildQueued = false
+
+-- Texto corto de la tecla asignada a un comando ("1", "s-Q", "M4"...), como en los botones de Blizzard
+local function CommandHotkey(command)
+    local key = GetBindingKey(command)
+    if not key then return end
+    local text = GetBindingText(key, 1)
+    if not text or text == "" then text = key end
+    return text
+end
+
+-- Comandos con los que se puede pulsar un botón: el de Blizzard, el de Dominos, el de LibActionButton
+-- o un clic directo
+local function ButtonHotkey(button)
+    local commands = {}
+    if type(button.bindingAction) == "string" then commands[#commands + 1] = button.bindingAction end
+    local attribute = button.GetAttribute and button:GetAttribute("commandName")
+    if type(attribute) == "string" then commands[#commands + 1] = attribute end
+    if type(button.GetBindingAction) == "function" then
+        local ok, command = pcall(button.GetBindingAction, button)
+        if ok and type(command) == "string" then commands[#commands + 1] = command end
+    end
+    local name = button:GetName()
+    if name then
+        commands[#commands + 1] = "CLICK " .. name .. ":LeftButton"
+        commands[#commands + 1] = "CLICK " .. name .. ":Keybind"
+        commands[#commands + 1] = "CLICK " .. name .. ":HOTKEY"
+    end
+    for _, command in ipairs(commands) do
+        local text = CommandHotkey(command)
+        if text then return text end
+    end
+    -- Último recurso: el texto que el propio botón ya muestra
+    local text = button.HotKey and button.HotKey:GetText()
+    if type(text) == "string" and not ns.IsSecret(text) and text ~= "" and text ~= RANGE_INDICATOR then
+        return text
+    end
+end
+
+-- Un hueco que no existe en esta versión del juego da error: se trata como vacío
+local function SlotHasAction(action)
+    local ok, has = pcall(HasAction, action)
+    return ok and has == true
+end
+
+local function AddSpellHotkey(spellID, text)
+    if not spellID or ns.IsSecret(spellID) then return end
+    if not hotkeyBySpell[spellID] then hotkeyBySpell[spellID] = text end
+    local base = C_Spell and C_Spell.GetBaseSpell and C_Spell.GetBaseSpell(spellID)
+    if base and not ns.IsSecret(base) and not hotkeyBySpell[base] then hotkeyBySpell[base] = text end
+end
+
+local function RebuildHotkeys()
+    wipe(hotkeyBySpell)
+    -- 1) Botones a la vista, de cualquier addon (lo que el jugador ve en pantalla manda)
+    for _, info in ipairs(buttonList) do
+        local button = info.button
+        local visible = button:IsVisible()
+        if not info.noActionSlot and visible == true then
+            local action = ActionSlot(button)
+            if action and HasAction(action) then
+                local spellID = ActionSpellID(action)
+                local text = spellID and ButtonHotkey(button)
+                if text then AddSpellHotkey(spellID, text) end
+            end
+        end
+    end
+    -- 2) Huecos de las barras de Blizzard aunque no se vean (formas, sigilo, barras ocultas)
+    for _, range in ipairs(SLOT_COMMANDS) do
+        for action = range.first, range.last do
+            if SlotHasAction(action) then
+                local spellID = ActionSpellID(action)
+                local text = spellID and CommandHotkey(range.command .. ((action - range.first) % 12 + 1))
+                if text then AddSpellHotkey(spellID, text) end
+            end
+        end
+    end
+    hotkeysDirty = false
+    if ns.RefreshKeybinds then ns.RefreshKeybinds() end
+end
+
+-- Tecla del hechizo (o de su versión base), o nil si no está en ninguna barra con tecla asignada
+function ns.GetSpellHotkey(spellID)
+    if not spellID or ns.IsSecret(spellID) then return end
+    return hotkeyBySpell[spellID]
+end
+
+-- Las teclas y las barras no se pueden cambiar en combate: se recalcula al salir
+function ns.QueueHotkeyRebuild()
+    hotkeysDirty = true
+    if rebuildQueued or InCombatLockdown() then return end
+    rebuildQueued = true
+    C_Timer.After(0.2, function()
+        rebuildQueued = false
+        if InCombatLockdown() then return end
+        RebuildHotkeys()
+    end)
+end
+
+local hotkeyEvents = CreateFrame("Frame")
+for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "UPDATE_BINDINGS", "ACTIONBAR_SLOT_CHANGED",
+    "ACTIONBAR_PAGE_CHANGED", "UPDATE_BONUS_ACTIONBAR", "SPELLS_CHANGED", "PLAYER_REGEN_ENABLED",
+    "PLAYER_SPECIALIZATION_CHANGED", "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" }) do
+    pcall(hotkeyEvents.RegisterEvent, hotkeyEvents, event)
+end
+hotkeyEvents:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_REGEN_ENABLED" and not hotkeysDirty then return end
+    ns.QueueHotkeyRebuild()
+end)
