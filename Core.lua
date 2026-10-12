@@ -147,6 +147,7 @@ ns.PROFILE_DEFAULTS = {
     -- Barras de buffs
     barTexture = "flat",
     barColor = { 0.55, 0.25, 0.95, 1 },
+    barClassColor = false,                    -- usar el color de la clase en vez del color de barra elegido
     bgColor = { 0.07, 0.03, 0.12, 0.85 },
 
     -- Textos

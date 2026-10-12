@@ -82,6 +82,15 @@ function ns.BorderColor(db)
     return c[1], c[2], c[3], c[4] or 1
 end
 
+function ns.BarColor(db)
+    if db.barClassColor then
+        local r, g, b = ns.ClassColor()
+        return r, g, b, db.barColor[4] or 1
+    end
+    local c = db.barColor
+    return c[1], c[2], c[3], c[4] or 1
+end
+
 function ns.MakeBorder(parent, anchor)
     local border = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     border.anchor = anchor
@@ -260,8 +269,7 @@ local function SkinBar(item, d, db)
         local t = bar:GetStatusBarTexture()
         if t then t:SetAtlas(BLIZZ_BAR_ATLAS) end
     end
-    local c = db.barColor
-    bar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
+    bar:SetStatusBarColor(ns.BarColor(db))
     if bar.BarBG then bar.BarBG:SetAlpha(0) end
     if not d.barBg then
         d.barBg = bar:CreateTexture(nil, "BACKGROUND", nil, -8)
@@ -765,8 +773,8 @@ function ns.RefreshPreview(p)
     end
     local bar = p.bar
     bar:SetStatusBarTexture(ns.ResolveBarTexture(db.barTexture) or WHITE)
-    local c, bg = db.barColor, db.bgColor
-    bar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
+    local bg = db.bgColor
+    bar:SetStatusBarColor(ns.BarColor(db))
     bar.bg:SetColorTexture(bg[1], bg[2], bg[3], bg[4] or 1)
     ns.LayoutBorder(bar.border, db.borderSize, r, g, b, a)
     ns.StyleText(bar.name, db.barTextSize, db.countOutline, nil)

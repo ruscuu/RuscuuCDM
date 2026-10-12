@@ -546,6 +546,9 @@ local function BuildCooldownManager(ui)
     ui:Color(1, L["Bar color"], "barColor")
     ui:Color(2, L["Bar background"], "bgColor")
     ui:Next(32)
+    ui:DBCheck(1, L["Class color bars"], "barClassColor",
+        L["Uses your class color for the buff bars instead of the chosen bar color."])
+    ui:Next(32)
 end
 
 ------------------------------------------------------------------------
@@ -1003,7 +1006,7 @@ local SUBPAGES = {
         key = "cdm", titleKey = "Cooldown Manager", descKey = "Icons, borders, swipe and buff bars.",
         build = BuildCooldownManager,
         resetKeys = { "enabled", "squareIcons", "iconZoom", "borderSize", "borderColor", "borderClassColor",
-            "showSwipe", "swipeColor", "cooldownEdge", "cooldownBling", "barTexture", "barColor", "bgColor" },
+            "showSwipe", "swipeColor", "cooldownEdge", "cooldownBling", "barTexture", "barColor", "barClassColor", "bgColor" },
     },
     {
         key = "texts", titleKey = "Texts and numbers", descKey = "Font, countdown numbers, charges and bar texts.",

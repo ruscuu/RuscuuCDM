@@ -156,6 +156,8 @@ L["The flash Blizzard plays when a cooldown finishes."] = "El destello que muest
 L["Buff bars"] = "Barras de buffs"
 L["Bar texture"] = "Textura de la barra"
 L["Bar color"] = "Color de la barra"
+L["Class color bars"] = "Barras del color de la clase"
+L["Uses your class color for the buff bars instead of the chosen bar color."] = "Usa el color de tu clase en las barras de buffs en lugar del color de barra elegido."
 L["Bar background"] = "Fondo de la barra"
 
 -- Página Textos y números

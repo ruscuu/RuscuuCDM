@@ -170,7 +170,7 @@ ns.THEMES = {
     {
         nameKey = "Ruscuu Neon",
         values = {
-            squareIcons = true, borderSize = 2, iconZoom = 0.08, borderClassColor = false,
+            squareIcons = true, borderSize = 2, iconZoom = 0.08, borderClassColor = false, barClassColor = false,
             borderColor = { 0.61, 0.30, 1.00, 1 }, barColor = { 0.55, 0.25, 0.95, 1 },
             bgColor = { 0.07, 0.03, 0.12, 0.85 }, swipeColor = { 0.08, 0, 0.15, 0.75 },
             numberColor = { 0.95, 0.91, 0.84, 1 }, actionBarNumberColor = { 0.95, 0.91, 0.84, 1 },
@@ -180,7 +180,7 @@ ns.THEMES = {
     {
         nameKey = "Minimal",
         values = {
-            squareIcons = true, borderSize = 1, iconZoom = 0.10, borderClassColor = false,
+            squareIcons = true, borderSize = 1, iconZoom = 0.10, borderClassColor = false, barClassColor = false,
             borderColor = { 0, 0, 0, 1 }, barColor = { 0.80, 0.80, 0.80, 1 },
             bgColor = { 0, 0, 0, 0.60 }, swipeColor = { 0, 0, 0, 0.7 },
             numberColor = { 1, 1, 1, 1 }, actionBarNumberColor = { 1, 1, 1, 1 },
@@ -190,7 +190,7 @@ ns.THEMES = {
     {
         nameKey = "Dark",
         values = {
-            squareIcons = true, borderSize = 1, iconZoom = 0.08, borderClassColor = false,
+            squareIcons = true, borderSize = 1, iconZoom = 0.08, borderClassColor = false, barClassColor = false,
             borderColor = { 0.25, 0.22, 0.30, 1 }, barColor = { 0.35, 0.30, 0.45, 1 },
             bgColor = { 0.05, 0.05, 0.07, 0.90 }, swipeColor = { 0, 0, 0, 0.85 },
             numberColor = { 0.85, 0.85, 0.85, 1 }, actionBarNumberColor = { 0.85, 0.85, 0.85, 1 },
@@ -200,7 +200,7 @@ ns.THEMES = {
     {
         nameKey = "Class color",
         values = {
-            squareIcons = true, borderSize = 2, iconZoom = 0.08, borderClassColor = true,
+            squareIcons = true, borderSize = 2, iconZoom = 0.08, borderClassColor = true, barClassColor = true,
             barColor = { 0.55, 0.25, 0.95, 1 }, bgColor = { 0, 0, 0, 0.7 }, swipeColor = { 0, 0, 0, 0.75 },
             numberColor = { 1, 1, 1, 1 }, actionBarNumberColor = { 1, 1, 1, 1 },
             expireColor = { 1, 0.82, 0, 1 },
@@ -209,7 +209,7 @@ ns.THEMES = {
     {
         nameKey = "Blizzard style",
         values = {
-            squareIcons = false, borderSize = 0, iconZoom = 0, borderClassColor = false,
+            squareIcons = false, borderSize = 0, iconZoom = 0, borderClassColor = false, barClassColor = false,
             barColor = { 1, 0.5, 0.25, 1 }, bgColor = { 0, 0, 0, 0.5 }, swipeColor = { 0, 0, 0, 0.7 },
             numberColor = { 1, 1, 1, 1 }, actionBarNumberColor = { 1, 1, 1, 1 },
             expireColor = { 1, 0.82, 0, 1 },
