@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.1
+
+**Fixed**
+- The first time you opened an options page after logging in or `/reload`, it was blank until you went to another page and came back.
+
 ## v0.4.0
 
 **New**

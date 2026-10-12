@@ -389,6 +389,9 @@ end
 -- Las páginas se construyen la primera vez que se abren (el panel ya tiene su tamaño definitivo)
 local function CreatePage(titleKey, descKey, resetKeys, build)
     local panel = CreateFrame("Frame")
+    -- Oculto desde el principio: si no, el primer Show() de la ventana de opciones no dispara OnShow
+    -- (el marco ya estaba visible) y la página sale en blanco hasta salir y volver a entrar
+    panel:Hide()
     panel.OnCommit = function() end
     panel.OnDefault = function() end
     panel.OnRefresh = function() end
