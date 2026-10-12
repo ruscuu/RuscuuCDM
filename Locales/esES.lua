@@ -181,6 +181,7 @@ L["Charges color"] = "Color de las cargas"
 L["Buff bar texts"] = "Textos de las barras de buffs"
 L["Name and duration size"] = "Tamaño del nombre y la duración"
 
+-- Página Textos y números: atajos de teclado
 L["Keybinds"] = "Atajos de teclado"
 L["Show keybinds"] = "Mostrar atajos de teclado"
 L["Shows on each Cooldown Manager icon the key that casts it, taken from your action bars."] = "Muestra en cada icono del Cooldown Manager la tecla que lo lanza, según tus barras de acción."
@@ -225,6 +226,7 @@ L["Speed"] = "Velocidad"
 L["Minimum opacity"] = "Opacidad mínima"
 L["How much the border fades between blinks."] = "Cuánto se desvanece el borde entre parpadeos."
 
+-- Página Borde dorado: buffs a punto de terminar
 L["Buffs about to end"] = "Buffs a punto de terminar"
 L["Border when a buff is about to end"] = "Borde cuando un buff va a terminar"
 L["On the Cooldown Manager's buff icons and bars, so you know when to refresh them. Uses the thickness, glow and blinking above."] = "En los iconos y barras de buffs del Cooldown Manager, para saber cuándo renovarlos. Usa el grosor, el resplandor y el parpadeo de arriba."
