@@ -142,6 +142,58 @@ function M.RunTimers()
     for _, fn in ipairs(list) do fn() end
 end
 
+-- Curvas de color (C_CurveUtil) y duraciones (DurationObject) simuladas: la curva se evalúa por tramos
+-- lineales. Devuelve Duration(segundos restantes) para crear duraciones de prueba.
+function M.InstallCurves()
+    _G.CreateColor = function(r, g, b, a)
+        return { r = r, g = g, b = b, a = a, GetRGBA = function(c) return c.r, c.g, c.b, c.a end }
+    end
+    _G.C_CurveUtil = { CreateColorCurve = function()
+        local curve = { points = {} }
+        function curve:AddPoint(x, color) table.insert(self.points, { x = x, c = color }) end
+        function curve:Evaluate(x)
+            local p = self.points
+            for i = 1, #p - 1 do
+                if x >= p[i].x and x <= p[i + 1].x then
+                    local t = (x - p[i].x) / (p[i + 1].x - p[i].x)
+                    local a, b = p[i].c, p[i + 1].c
+                    return CreateColor(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, a.a + (b.a - a.a) * t)
+                end
+            end
+            return p[#p].c
+        end
+        return curve
+    end }
+    return function(remaining)
+        return { EvaluateRemainingDuration = function(_, curve) return curve:Evaluate(remaining) end }
+    end
+end
+
+-- Frame del borde dorado de un frame (el que tiene un hijo con 4 lados y el resplandor), o nil
+function M.ExpireBorderFrame(owner)
+    for _, child in ipairs(owner._children or {}) do
+        local inner = child._children and child._children[1]
+        if inner and inner._regions and #inner._regions == 5 then return child, inner end
+    end
+end
+
+-- El borde dorado de un frame: si se ve y con qué color (nil si no tiene)
+function M.ExpireBorder(owner)
+    local border, inner = M.ExpireBorderFrame(owner)
+    if not border then return end
+    local color = inner._regions[1]._vertex
+    return border._shown and color ~= nil and color[4] > 0.5, color
+end
+
+-- El frame que actualiza los bordes en cada fotograma (OnUpdate sin padre, creado por Skin.lua)
+function M.Tick(seconds)
+    seconds = seconds or 0.2
+    M.now = (M.now or 100) + seconds
+    for _, f in ipairs(M.frames) do
+        if not f._parent and f._scripts and f._scripts.OnUpdate then f._scripts.OnUpdate(f, seconds) end
+    end
+end
+
 function M.install()
     _G.SlashCmdList, _G.StaticPopupDialogs, _G.UISpecialFrames = {}, {}, {}
     _G.GetLocale = function() return "enUS" end

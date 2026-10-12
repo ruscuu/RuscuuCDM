@@ -471,19 +471,43 @@ local function LayoutExpire(entry, owner)
     entry.glow:SetShown(db.expireGlowShow and glow > 0)
 end
 
+-- ¿El cooldown de este hechizo es solo el tiempo de reutilización global? El juego nunca oculta este dato
+-- (isOnGCD), ni en combate. Sin él, el GCD encendería el borde en todos los botones al lanzar algo.
+function ns.SpellOnGCD(spellID)
+    if not spellID or ns.IsSecret(spellID) or not (C_Spell and C_Spell.GetSpellCooldown) then return false end
+    local info = C_Spell.GetSpellCooldown(spellID)
+    return info ~= nil and info.isOnGCD == true
+end
+
+-- El dato isOnGCD solo es fiable al recibir el aviso de cambio de cooldowns: se guarda en ese momento
+local function CheckGCD(entry)
+    if not entry.isOnGCD then return false end
+    local ok, onGCD = pcall(entry.isOnGCD)
+    return ok and onGCD == true
+end
+
 -- Registra un frame (icono del Cooldown Manager o botón de acción) para el borde dorado.
 -- getDuration devuelve el DurationObject de su cooldown, o nil si no tiene o está excluido.
 -- kind = "buff" para los buffs a punto de terminar (otra curva y otro color).
-function ns.TrackExpire(owner, tex, getDuration, kind)
+-- isOnGCD (opcional) dice si su cooldown es solo el tiempo de reutilización global: entonces no hay borde.
+function ns.TrackExpire(owner, tex, getDuration, kind, isOnGCD)
     local entry = tracked[owner]
     if not entry then
         entry = { errors = 0 }
         tracked[owner] = entry
         trackedCount = trackedCount + 1
     end
-    entry.tex, entry.getDuration, entry.kind = tex, getDuration, kind
+    entry.tex, entry.getDuration, entry.kind, entry.isOnGCD = tex, getDuration, kind, isOnGCD
+    entry.gcd = CheckGCD(entry)
     LayoutExpire(entry, owner)
 end
+
+local gcdEvents = CreateFrame("Frame")
+gcdEvents:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+gcdEvents:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN")
+gcdEvents:SetScript("OnEvent", function()
+    for _, entry in pairs(tracked) do entry.gcd = CheckGCD(entry) end
+end)
 
 function ns.UntrackExpire(owner)
     local entry = tracked[owner]
@@ -508,6 +532,10 @@ function ns.ExpireAllowed(spellID)
 end
 
 local function UpdateEntry(entry, curve)
+    if entry.gcd then
+        entry.border:Hide()
+        return
+    end
     local duration = entry.getDuration()
     if not duration then
         entry.border:Hide()
@@ -588,11 +616,16 @@ end)
 
 -- Cooldown de un icono del Cooldown Manager (ignorando el cooldown global).
 -- Se usa el hechizo base: el hechizo "actual" puede ser un aura secreta en combate.
-local function ViewerItemDuration(item)
+local function ViewerItemSpell(item)
     local spellID = item.GetBaseSpellID and item:GetBaseSpellID()
     if not spellID and item.GetSpellID then spellID = item:GetSpellID() end
     if not spellID or ns.IsSecret(spellID) then return end
-    if not ns.ExpireAllowed(spellID) then return end
+    return spellID
+end
+
+local function ViewerItemDuration(item)
+    local spellID = ViewerItemSpell(item)
+    if not spellID or not ns.ExpireAllowed(spellID) then return end
     return C_Spell.GetSpellCooldownDuration(spellID, true)
 end
 
@@ -679,7 +712,8 @@ function ns.SkinViewer(entry)
         if entry.cooldowns then LayoutKeybind(item, on and db.showKeybinds) end
         local tex = IconTexture(item)
         if entry.cooldowns and on and db.expireOnCDM and tex then
-            ns.TrackExpire(item, tex, function() return ViewerItemDuration(item) end)
+            ns.TrackExpire(item, tex, function() return ViewerItemDuration(item) end, nil,
+                function() return ns.SpellOnGCD(ViewerItemSpell(item)) end)
         elseif not entry.cooldowns and on and db.buffEndGlow and tex then
             -- En las barras con el icono oculto el borde rodea la barra
             local holder = IconHolder(item)

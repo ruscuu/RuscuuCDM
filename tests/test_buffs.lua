@@ -1,27 +1,7 @@
 -- Borde dorado de cooldowns y aviso de buffs a punto de terminar (curvas de color simuladas)
 package.path = "tests/?.lua;" .. package.path
 local M = require("wowmock"); M.install()
--- Curvas de color y duraciones simuladas: la curva se evalúa por tramos lineales
-CreateColor = function(r, g, b, a) return { r = r, g = g, b = b, a = a, GetRGBA = function(c) return c.r, c.g, c.b, c.a end } end
-C_CurveUtil = { CreateColorCurve = function()
-    local cv = { points = {} }
-    function cv:AddPoint(x, c) table.insert(self.points, { x = x, c = c }) end
-    function cv:Evaluate(x)
-        local p = self.points
-        for i = 1, #p - 1 do
-            if x >= p[i].x and x <= p[i + 1].x then
-                local t = (x - p[i].x) / (p[i + 1].x - p[i].x)
-                local a, b = p[i].c, p[i + 1].c
-                return CreateColor(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, a.a + (b.a - a.a) * t)
-            end
-        end
-        return p[#p].c
-    end
-    return cv
-end }
-local function Duration(remaining)
-    return { EvaluateRemainingDuration = function(_, curve) return curve:Evaluate(remaining) end }
-end
+local Duration = M.InstallCurves()
 local auras = {}       -- auraInstanceID -> segundos restantes
 C_UnitAuras = { GetAuraDuration = function(_, id)
     if auras[id] == nil then error("aura no válida") end
@@ -60,25 +40,13 @@ local b1, b2, b3, bSecret, bGone = buffIcon(1), buffIcon(2), buffIcon(3), buffIc
 local bar = buffBar(4, false)
 auras[1], auras[2], auras[3], auras[4] = 3, 20, 0, 2   -- 3 s, 20 s, sin duración, 2 s
 
-local driver
-for _, f in ipairs(M.frames) do if f._scripts and f._scripts.OnUpdate and not f._parent then driver = f end end
-local function tick() M.now = (M.now or 100) + 0.2; driver._scripts.OnUpdate(driver, 0.2) end
-local function borderOf(item)
-    for _, child in ipairs(item._children or {}) do
-        if child._children and child._children[1] and child._children[1]._regions and #child._children[1]._regions == 5 then
-            return child, child._children[1]._regions[1]
-        end
-    end
-end
-local function shownWithAlpha(item)
-    local border, edge = borderOf(item)
-    if not border or not border._shown then return false end
-    return edge._vertex[4] > 0.5, edge._vertex
-end
+local tick = M.Tick
+local borderOf = M.ExpireBorderFrame
+local shownWithAlpha = M.ExpireBorder
 
 -- Desactivado por defecto: los buffs no llevan borde
 ns.RebuildExpireCurve(); ns.SkinAll(); tick()
-assert(borderOf(b1) == nil, "sin la opción no se crea el borde")
+assert(not borderOf(b1), "sin la opción no se crea el borde")
 -- Activado: 3 s (dentro de 5 s) -> naranja; 20 s -> transparente; sin duración -> transparente
 ns.db.buffEndGlow = true; ns.UpdateExpire(); ns.SkinAll(); tick()
 local on, color = shownWithAlpha(b1)

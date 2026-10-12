@@ -112,6 +112,17 @@ local function ButtonDuration(button)
     return C_ActionBar.GetActionCooldownDuration(action, true)
 end
 
+-- ¿El cooldown del botón es solo el tiempo de reutilización global? (dato que el juego nunca oculta)
+local function ActionOnGCD(button)
+    local action = ActionSlot(button)
+    if not action then return false end
+    if C_ActionBar and C_ActionBar.GetActionCooldown then
+        local info = C_ActionBar.GetActionCooldown(action)
+        return info ~= nil and info.isOnGCD == true
+    end
+    return ns.SpellOnGCD(ActionSpellID(action))
+end
+
 local function UpdateExpireTracking()
     local db = ns.db
     local canTrack = C_ActionBar and C_ActionBar.GetActionCooldownDuration
@@ -119,7 +130,8 @@ local function UpdateExpireTracking()
         local button = info.button
         local icon = button.icon or button.Icon
         if canTrack and icon and not info.noActionSlot and db.expireOnActionBars and BarEnabled(info.bar) then
-            ns.TrackExpire(button, icon, function() return ButtonDuration(button) end)
+            ns.TrackExpire(button, icon, function() return ButtonDuration(button) end, nil,
+                function() return ActionOnGCD(button) end)
         else
             ns.UntrackExpire(button)
         end

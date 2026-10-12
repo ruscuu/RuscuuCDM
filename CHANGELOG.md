@@ -13,6 +13,7 @@
 
 **Fixed**
 - The first time you opened an options page after logging in or `/reload`, it was blank until you went to another page and came back.
+- The global cooldown no longer lights up the golden border on every button when you cast a spell.
 
 ## v0.4.0
 
