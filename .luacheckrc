@@ -23,11 +23,11 @@ read_globals = {
 
     -- Espacios de nombres C_*
     "C_ActionBar", "C_ClassColor", "C_CooldownViewer", "C_CurveUtil", "C_CVar", "C_DurationUtil",
-    "C_SpecializationInfo", "C_Spell", "C_Timer", "C_UnitAuras",
+    "C_PetInfo", "C_SpecializationInfo", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras", "Enum",
 
     -- Funciones
     "CreateColor", "CreateFont", "CreateFrame", "GetActionInfo", "GetBindingKey", "GetBindingText",
-    "GetCursorPosition", "GetInventoryItemCooldown", "GetLocale", "GetMinimapShape", "GetNumSpecializations", "GetPrimaryTalentTree",
+    "GetCursorPosition", "GetFlyoutInfo", "GetFlyoutSlotInfo", "GetInventoryItemCooldown", "GetInventoryItemTexture", "GetLocale", "GetMinimapShape", "GetNumSpecializations", "GetPrimaryTalentTree",
     "GetRealmName", "geterrorhandler", "GetSpecialization", "GetSpecializationInfo", "GetSpecializationInfoForClassID",
     "GetTime", "HasAction", "hooksecurefunc", "InCombatLockdown", "IsLoggedIn", "IsShiftKeyDown",
     "issecretvalue", "LibStub", "PlaySound", "ReloadUI", "SetCVar", "ShowUIPanel", "StaticPopup_Show",

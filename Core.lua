@@ -146,9 +146,17 @@ ns.PROFILE_DEFAULTS = {
     cooldownEdge = "blizzard",                -- línea brillante del barrido: blizzard | show | hide
     cooldownBling = "blizzard",               -- destello al terminar: blizzard | show | hide
 
-    -- Solo los cooldowns activos, en una línea centrada (esenciales y utilidad juntos)
+    -- Barra de solo cooldowns activos, en una línea centrada donde está la barra de esenciales
     activeOnly = false,
     activeFlash = true,                       -- al terminar, el icono se queda un segundo con un destello
+    activeBuffs = true,                       -- los buffs activos del Cooldown Manager van en la misma línea
+    activeSize = 40,                          -- tamaño de los iconos de la barra
+    activeSpacing = 4,                        -- separación entre iconos
+    activeCDM = true,                         -- incluir los hechizos de esenciales y utilidad
+    activeAdd = {},                           -- [spellID] = true: hechizos añadidos a la barra
+    activeRemove = {},                        -- [spellID] = true: hechizos del Cooldown Manager quitados
+    activeTrinket1 = false,                   -- abalorio de arriba (hueco 13)
+    activeTrinket2 = false,                   -- abalorio de abajo (hueco 14)
 
     -- Barras de buffs
     barTexture = "flat",
@@ -221,6 +229,8 @@ ns.LIMITS = {
     expirePulseSpeed = { 0.2, 5 },
     expirePulseMin = { 0, 0.9 },
     buffEndSeconds = { 1, 60 },
+    activeSize = { 20, 80 },
+    activeSpacing = { 0, 20 },
 }
 
 -- Valores permitidos para las opciones de lista (los usa la importación)
@@ -591,6 +601,7 @@ function ns.GetStatus()
         expireBroken = ns.IsExpireBroken(),
         auraAPI = ns.HasAuraDurationAPI(),
         activeAPI = ns.ActiveCooldownAPI(),
+        activeEntries = ns.CountActiveEntries(),
     }
 end
 
@@ -608,6 +619,7 @@ function ns.Debug()
         s.curveAPI and yes or no, s.expireTracked, s.expireReads)
         .. (s.expireBroken and " |cffff5555(" .. L["disabled"] .. ")|r" or ""), true)
     ns.Print(L["Buffs about to end: aura API %s"]:format(s.auraAPI and yes or no), true)
-    ns.Print(L["Active cooldowns: cooldown state %s"]:format(s.activeAPI == nil and "?" or (s.activeAPI and yes or no)), true)
+    ns.Print(L["Active cooldowns: cooldown state %s"]:format(s.activeAPI == nil and "?" or (s.activeAPI and yes or no))
+        .. " · " .. L["%d in the bar"]:format(s.activeEntries), true)
     ns.Print(L["Active profile: %s"]:format(ns.activeProfile), true)
 end

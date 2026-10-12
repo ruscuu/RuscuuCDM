@@ -255,7 +255,7 @@ end
 
 local PREFIX = "!RUSCUU:1!"
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local SPELL_SET_KEYS = { expireExclude = true } -- conjuntos de hechizos: se exportan como "123,456"
+local SPELL_SET_KEYS = { expireExclude = true, activeAdd = true, activeRemove = true } -- conjuntos de hechizos: se exportan como "123,456"
 
 local function B64Char(n)
     return B64:sub(n + 1, n + 1)

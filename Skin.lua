@@ -739,6 +739,7 @@ function ns.RefreshKeybinds()
             for _, item in ipairs(ItemFrames(viewer)) do LayoutKeybind(item, show) end
         end
     end
+    if ns.RefreshActiveKeybinds then ns.RefreshActiveKeybinds() end
 end
 
 function ns.SkinAll()
@@ -747,6 +748,7 @@ function ns.SkinAll()
     for _, entry in ipairs(ns.VIEWERS) do
         ns.SkinViewer(entry)
     end
+    if ns.RefreshActiveBar then ns.RefreshActiveBar() end
     if ns.RefreshPreviews then ns.RefreshPreviews() end
 end
 

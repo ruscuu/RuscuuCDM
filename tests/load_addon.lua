@@ -13,7 +13,7 @@ assert(ns.GetSpellHotkey(100) == "1", "tecla del hechizo tras iniciar sesión")
 
 -- Páginas de opciones: empiezan ocultas y se construyen la primera vez que se muestran
 -- (si empezaran visibles, la primera vez saldrían en blanco)
-assert(#pages == 7, "páginas registradas: " .. #pages)
+assert(#pages == 8, "páginas registradas: " .. #pages)
 for i, page in ipairs(pages) do
     assert(not page:IsShown(), "la página " .. i .. " debe empezar oculta")
     page._width = 640
@@ -58,11 +58,17 @@ ns.db.activeOnly = false
 M.Tick(0.2)
 
 -- Exportar e importar conserva las opciones nuevas
+ns.db.activeAdd = { [50] = true, [642] = true }
+ns.db.activeRemove = { [100] = true }
+ns.db.activeSize = 52
 local text = ns.ExportProfile()
 ns.db.keybindAnchor = "BOTTOMLEFT"; ns.db.buffEndGlow = true; ns.db.bars.addons = false
+ns.db.activeAdd, ns.db.activeRemove, ns.db.activeSize = {}, {}, 40
 local ok = ns.ImportProfile(text)
 assert(ok and ns.db.keybindAnchor == "TOPRIGHT" and ns.db.buffEndGlow == false and ns.db.bars.addons == true,
     "importar recupera las opciones nuevas")
+assert(ns.db.activeAdd[50] and ns.db.activeAdd[642] and ns.db.activeRemove[100] and ns.db.activeSize == 52,
+    "importar recupera los hechizos de la barra de cooldowns activos")
 
 -- Diagnóstico (/rcm debug) sin errores en este idioma
 local realPrint = print

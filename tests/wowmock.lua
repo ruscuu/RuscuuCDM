@@ -100,6 +100,15 @@ function Object:HasFocus() return self._focus == true end
 function Object:SetChecked(v) self._checked = v end
 function Object:GetChecked() return self._checked end
 function Object:GetStringHeight() return 12 end
+-- Cooldowns: se guarda lo último que se dibujó (duración del juego o inicio y duración)
+function Object:SetCooldownFromDurationObject(d) self._cooldown = { duration = d } end
+function Object:SetCooldown(start, duration) self._cooldown = { start = start, duration = duration } end
+function Object:Clear() self._cooldown = nil end
+function Object:SetTexture(t) self._texture = t end
+function Object:SetDesaturated(on) self._desaturated = on and true or false end
+function Object:IsDesaturated() return self._desaturated == true end
+function Object:SetDrawSwipe(on) self._swipe = on end
+function Object:SetDrawEdge(on) self._edge = on end
 
 function M.NewRegion(kind, parent)
     local r = setmetatable({ _type = kind, _parent = parent, _shown = true }, Object)

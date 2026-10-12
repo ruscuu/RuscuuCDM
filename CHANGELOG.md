@@ -3,7 +3,11 @@
 ## v0.5.0
 
 **New**
-- **Only active cooldowns**: hides the cooldowns that are ready and shows the ones on cooldown, essential and utility together, in one line centered where the essential cooldowns are. The global cooldown doesn't count, and when a cooldown ends its icon stays one second with a flash. Everything goes back to normal while Edit Mode or Blizzard's cooldown settings are open (off by default).
+- **Active cooldowns bar**: a bar of the addon's own that shows only the cooldowns that are running, in one line centered where the essential cooldowns are, with the active buffs of the Cooldown Manager next to them. Blizzard's essential and utility icons are hidden while it is on (off by default).
+  - **Choose any spell**: the Cooldown Manager's spells come checked; uncheck any of them or add any spell of your spellbook (pet spells and flyouts too), any other spell by its ID or name, and your trinkets. New "Active cooldowns" options page with a search box.
+  - **Icon size and spacing** of your own, and the buffs are resized to match.
+  - Spells with charges show while a charge is recharging, with the number of charges. The global cooldown doesn't count, and when a cooldown ends its icon stays one second with a flash.
+  - Keybinds, golden border, swipe, numbers and borders follow your style. Everything goes back to normal while Edit Mode or Blizzard's cooldown settings are open.
 - **Keybinds on Cooldown Manager icons**: each cooldown shows the key that casts it, taken from your action bars (also from form, stance and stealth bars). Customizable size, color, outline and corner. On by default.
 - **Border when a buff is about to end**, on the Cooldown Manager's buff icons and bars, with its own color and seconds (off by default). Like the golden border, the game decides when it shows: the addon never reads the remaining time.
 - **Bartender4, Dominos and ElvUI**: their action buttons get the styled numbers, the golden border and keybinds too (new "Bars from other addons" checkbox).
