@@ -22,13 +22,13 @@ It only changes how things look — it never reads combat data, so it follows Fo
 
 | Command | Description |
 |---|---|
-| `/ruscuu` or `/rcdm` | Open options |
-| `/ruscuu cooldowns` | Choose which cooldowns are shown (Blizzard's panel) |
-| `/ruscuu test` | Preview the golden border for 5 seconds |
-| `/ruscuu skin` | Reapply the style |
-| `/ruscuu minimap` | Show or hide the minimap button |
-| `/ruscuu debug` | Diagnostic information |
-| `/ruscuu reset` | Reset all settings (asks first) |
+| `/rcm` or `/rcmf` | Open options |
+| `/rcm cooldowns` | Choose which cooldowns are shown (Blizzard's panel) |
+| `/rcm test` | Preview the golden border for 5 seconds |
+| `/rcm skin` | Reapply the style |
+| `/rcm minimap` | Show or hide the minimap button |
+| `/rcm debug` | Diagnostic information |
+| `/rcm reset` | Reset all settings (asks first) |
 
 ---
 
@@ -54,13 +54,13 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 
 | Comando | Qué hace |
 |---|---|
-| `/ruscuu` o `/rcdm` | Abre las opciones |
-| `/ruscuu cooldowns` | Elige qué cooldowns se muestran (panel de Blizzard) |
-| `/ruscuu test` | Muestra el borde dorado durante 5 segundos |
-| `/ruscuu skin` | Reaplica el estilo |
-| `/ruscuu minimap` | Muestra u oculta el botón del minimapa |
-| `/ruscuu debug` | Información de diagnóstico |
-| `/ruscuu reset` | Borra toda la configuración (pide confirmación) |
+| `/rcm` o `/rcmf` | Abre las opciones |
+| `/rcm cooldowns` | Elige qué cooldowns se muestran (panel de Blizzard) |
+| `/rcm test` | Muestra el borde dorado durante 5 segundos |
+| `/rcm skin` | Reaplica el estilo |
+| `/rcm minimap` | Muestra u oculta el botón del minimapa |
+| `/rcm debug` | Información de diagnóstico |
+| `/rcm reset` | Borra toda la configuración (pide confirmación) |
 
 ## Publishing / Publicación
 

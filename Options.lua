@@ -324,8 +324,8 @@ end
 -- Vista previa en vivo de los ajustes del perfil activo
 function Layout:Preview()
     local preview = ns.CreatePreview(self.content)
-    preview:SetPoint("TOPLEFT", 16, self.y - 6)
-    self:Next(76)
+    preview:SetPoint("TOPLEFT", 16, self.y - 4)
+    self:Next(92)
     return preview
 end
 
@@ -418,7 +418,7 @@ local function BuildGeneral(ui)
     local _, h = ui:Note(L["Choose which cooldowns appear, and in which bar, from Blizzard's own panel: drag a spell to \"Not Displayed\" to hide it. Your choice is saved for each specialization."])
     ui:Next(h)
     ui:Button(1, L["Choose visible cooldowns"], 260, function() ns.OpenCooldownSettings() end,
-        L["Opens Blizzard's Advanced Cooldown Settings. Also: /ruscuu cooldowns, or Shift + click on the minimap button."])
+        L["Opens Blizzard's Advanced Cooldown Settings. Also: /rcm cooldowns, or Shift + click on the minimap button."])
     ui:Next(34)
     ui:Check(1, L["Enable the Cooldown Manager on install"],
         function() return ns.global.autoEnableCDM end,
@@ -480,13 +480,13 @@ local function BuildGeneral(ui)
 
     ui:Section(L["Commands"])
     local _, hc = ui:Note(table.concat({
-        "/ruscuu  — " .. L["open options"],
-        "/ruscuu cooldowns  — " .. L["choose which cooldowns are shown"],
-        "/ruscuu test  — " .. L["preview the golden border for 5 seconds"],
-        "/ruscuu skin  — " .. L["reapply the style"],
-        "/ruscuu minimap  — " .. L["show or hide the minimap button"],
-        "/ruscuu debug  — " .. L["diagnostic information"],
-        "/ruscuu reset  — " .. L["reset all settings"],
+        "/rcm  — " .. L["open options"],
+        "/rcm cooldowns  — " .. L["choose which cooldowns are shown"],
+        "/rcm test  — " .. L["preview the golden border for 5 seconds"],
+        "/rcm skin  — " .. L["reapply the style"],
+        "/rcm minimap  — " .. L["show or hide the minimap button"],
+        "/rcm debug  — " .. L["diagnostic information"],
+        "/rcm reset  — " .. L["reset all settings"],
     }, "\n"))
     ui:Next(hc + 4)
     ui:Button(1, L["Reset everything"], 200, function() ns.ShowPopup("RUSCUUCDM_RESET_ALL") end,

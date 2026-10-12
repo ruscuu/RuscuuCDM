@@ -477,17 +477,17 @@ end)
 
 function ns.PrintHelp()
     ns.Print(L["Commands"] .. ":", true)
-    print("  /ruscuu  — " .. L["open options"])
-    print("  /ruscuu cooldowns  — " .. L["choose which cooldowns are shown"])
-    print("  /ruscuu test  — " .. L["preview the golden border for 5 seconds"])
-    print("  /ruscuu skin  — " .. L["reapply the style"])
-    print("  /ruscuu minimap  — " .. L["show or hide the minimap button"])
-    print("  /ruscuu debug  — " .. L["diagnostic information"])
-    print("  /ruscuu reset  — " .. L["reset all settings"])
+    print("  /rcm  — " .. L["open options"])
+    print("  /rcm cooldowns  — " .. L["choose which cooldowns are shown"])
+    print("  /rcm test  — " .. L["preview the golden border for 5 seconds"])
+    print("  /rcm skin  — " .. L["reapply the style"])
+    print("  /rcm minimap  — " .. L["show or hide the minimap button"])
+    print("  /rcm debug  — " .. L["diagnostic information"])
+    print("  /rcm reset  — " .. L["reset all settings"])
 end
 
-SLASH_RUSCUUCDM1 = "/ruscuu"
-SLASH_RUSCUUCDM2 = "/rcdm"
+SLASH_RUSCUUCDM1 = "/rcm"
+SLASH_RUSCUUCDM2 = "/rcmf"
 SlashCmdList.RUSCUUCDM = function(msg)
     msg = strtrim(msg or ""):lower()
     if msg == "reset" then
@@ -534,7 +534,7 @@ StaticPopupDialogs["RUSCUUCDM_RESET_ALL"] = {
     hideOnEscape = true,
 }
 
--- Diagnóstico completo (/ruscuu debug); los datos también se muestran en la página General
+-- Diagnóstico completo (/rcm debug); los datos también se muestran en la página General
 function ns.GetStatus()
     local viewersFound = 0
     for _, entry in ipairs(ns.VIEWERS) do

@@ -666,12 +666,18 @@ local PREVIEW_ICONS = {
 -- Muestra cómo quedan los iconos, la barra, los números y el borde dorado con los ajustes actuales
 function ns.CreatePreview(parent)
     local p = CreateFrame("Frame", nil, parent)
-    p:SetSize(360, 64)
+    p:SetSize(400, 84)
     p.icons = {}
+
+    -- Título para que quede claro que son elementos de ejemplo, no barras reales
+    local caption = p:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    caption:SetPoint("TOPLEFT", 4, 0)
+    caption:SetText(L["Preview (example, not your real bars)"])
+    caption:SetTextColor(0.75, 0.75, 0.75)
     for i, info in ipairs(PREVIEW_ICONS) do
         local holder = CreateFrame("Frame", nil, p)
         holder:SetSize(40, 40)
-        holder:SetPoint("LEFT", (i - 1) * 52 + 4, 0)
+        holder:SetPoint("TOPLEFT", (i - 1) * 52 + 4, -24)
         local tex = holder:CreateTexture(nil, "ARTWORK")
         tex:SetAllPoints()
         tex:SetTexture(info.icon)
@@ -704,7 +710,7 @@ function ns.CreatePreview(parent)
 
     local bar = CreateFrame("StatusBar", nil, p)
     bar:SetSize(170, 18)
-    bar:SetPoint("LEFT", #PREVIEW_ICONS * 52 + 12, 0)
+    bar:SetPoint("TOPLEFT", #PREVIEW_ICONS * 52 + 12, -35)
     bar:SetMinMaxValues(0, 1)
     bar:SetValue(0.65)
     bar.bg = bar:CreateTexture(nil, "BACKGROUND")
@@ -712,11 +718,22 @@ function ns.CreatePreview(parent)
     bar.border = ns.MakeBorder(bar, bar)
     bar.name = bar:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
     bar.name:SetPoint("LEFT", 5, 0)
-    bar.name:SetText(L["Buff"])
+    bar.name:SetText(L["Example"])
     bar.duration = bar:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
     bar.duration:SetPoint("RIGHT", -6, 0)
     bar.duration:SetText("8")
     p.bar = bar
+
+    -- La barra de ejemplo se va vaciando y cuenta hacia atrás, como una barra de buff real (12 s en bucle)
+    local elapsedSinceUpdate = 0
+    p:SetScript("OnUpdate", function(_, elapsed)
+        elapsedSinceUpdate = elapsedSinceUpdate + elapsed
+        if elapsedSinceUpdate < 0.05 then return end
+        elapsedSinceUpdate = 0
+        local left = 12 - (GetTime() % 12)
+        bar:SetValue(left / 12)
+        bar.duration:SetText(("%d"):format(math.ceil(left)))
+    end)
 
     previews[#previews + 1] = p
     ns.RefreshPreview(p)
