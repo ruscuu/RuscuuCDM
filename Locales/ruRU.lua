@@ -85,6 +85,7 @@ L["Right-click: preview the golden border"] = "ПКМ: показать золо
 L["Drag: move button"] = "Перетаскивание: переместить кнопку"
 
 -- Panel: elementos comunes
+L["This page could not be shown because of an error. Please report it:"] = "Не удалось показать эту страницу из-за ошибки. Пожалуйста, сообщите этот текст:"
 L["Type a value and press Enter, or use the mouse wheel over it."] = "Введите значение и нажмите Enter или прокрутите колесо мыши над полем."
 L["Profile: %s"] = "Профиль: %s"
 L["Defaults"] = "По умолчанию"

@@ -469,7 +469,14 @@ local function CreatePage(titleKey, descKey, resetKeys, build)
             local content, width = BuildScroll(self)
             local ui = NewLayout(content, width)
             self.content, self.ui = content, ui
-            build(ui, self)
+            -- Si algo falla al construir la página se avisa en ella en vez de dejarla en blanco
+            local ok, err = pcall(build, ui, self)
+            if not ok then
+                local _, h = ui:Note("|cffff5555" .. L["This page could not be shown because of an error. Please report it:"]
+                    .. "|r\n" .. tostring(err))
+                ui:Next(h)
+                geterrorhandler()(err)
+            end
             content:SetHeight(-ui.y + 24)
         end
         ns.RefreshOptions()

@@ -85,6 +85,7 @@ L["Right-click: preview the golden border"] = "Clic derecho: ver el borde dorado
 L["Drag: move button"] = "Arrastrar: mover el botón"
 
 -- Panel: elementos comunes
+L["This page could not be shown because of an error. Please report it:"] = "Esta página no se pudo mostrar por un error. Por favor, avisa con este texto:"
 L["Type a value and press Enter, or use the mouse wheel over it."] = "Escribe un valor y pulsa Intro, o usa la rueda del ratón encima."
 L["Profile: %s"] = "Perfil: %s"
 L["Defaults"] = "Valores por defecto"

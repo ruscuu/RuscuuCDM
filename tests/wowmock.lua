@@ -43,9 +43,14 @@ function Object:GetHeight() return self._height or 36 end
 function Object:SetSize(w, h) self._width, self._height = w, h end
 function Object:SetWidth(w) self._width = w end
 function Object:SetHeight(h) self._height = h end
-function Object:SetText(t) self._text = t end
+-- Como en el juego: un texto sin fuente asignada da el error "Font not set" al escribir en él
+function Object:SetText(t)
+    if self._type == "FontString" and not self._hasFont then error("FontString:SetText(): Font not set", 2) end
+    self._text = t
+end
+function Object:SetFontObject(font) self._hasFont = font ~= nil end
 function Object:GetText() return self._text end
-function Object:SetFont(file, size, flags) self._font = { file, size, flags } return true end
+function Object:SetFont(file, size, flags) self._font = { file, size, flags }; self._hasFont = true; return true end
 function Object:GetFont() if self._font then return unpack(self._font) end return "Fonts\\FRIZQT__.TTF", 12, "" end
 function Object:SetVertexColor(r, g, b, a) self._vertex = { r, g, b, a } end
 function Object:SetAlpha(a) self._alpha = a end
@@ -66,7 +71,11 @@ function Object:RegisterEvent(e) self._events = self._events or {}; self._events
 function Object:GetChildren() return unpack(self._children or {}) end
 function Object:GetRegions() return unpack(self._regions or {}) end
 function Object:CreateTexture() return M.NewRegion("Texture", self) end
-function Object:CreateFontString() return M.NewRegion("FontString", self) end
+function Object:CreateFontString(_, _, template)
+    local fs = M.NewRegion("FontString", self)
+    fs._hasFont = template ~= nil
+    return fs
+end
 function Object:CreateMaskTexture() return M.NewRegion("MaskTexture", self) end
 function Object:SetAttribute(k, v) self._attr = self._attr or {}; self._attr[k] = v end
 function Object:GetAttribute(k) return self._attr and self._attr[k] end
@@ -92,7 +101,7 @@ function M.CreateFrame(kind, name, parent, template)
     local f = setmetatable({ _type = kind, _name = name, _parent = parent, _shown = true }, Object)
     table.insert(M.frames, f)
     template = template or ""
-    if template:find("CheckButton") then f.Text = f:CreateFontString() end
+    if template:find("CheckButton") then f.Text = f:CreateFontString(nil, "ARTWORK", "GameFontNormal") end
     if template:find("ScrollFrame") then f.ScrollBar = setmetatable({ _type = "Slider", _shown = true }, Object) end
     if parent then parent._children = parent._children or {}; table.insert(parent._children, f) end
     if name then _G[name] = f end
@@ -105,7 +114,7 @@ function M.NewActionButton(name, action, parent)
     b.action = action
     b.cooldown = M.CreateFrame("Cooldown", name and (name .. "Cooldown"), b)
     b.icon = b:CreateTexture()
-    b.HotKey = b:CreateFontString()
+    b.HotKey = b:CreateFontString(nil, "ARTWORK", "NumberFontNormalSmallGray")
     return b
 end
 

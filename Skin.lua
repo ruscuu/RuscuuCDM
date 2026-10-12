@@ -362,7 +362,7 @@ local function LayoutKeybind(item, show)
     if not d.keyFrame then
         -- Frame propio por encima del barrido y del borde dorado
         d.keyFrame = CreateFrame("Frame", nil, item)
-        d.keyLabel = d.keyFrame:CreateFontString(nil, "OVERLAY")
+        d.keyLabel = d.keyFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
     end
     local f = d.keyFrame
     f:ClearAllPoints()
@@ -814,7 +814,8 @@ function ns.CreatePreview(parent)
         keyFrame:SetAllPoints(tex)
         keyFrame:SetFrameLevel(holder:GetFrameLevel() + 7)
         holder.keyFrame = keyFrame
-        holder.key = keyFrame:CreateFontString(nil, "OVERLAY")
+        -- Con fuente desde el principio: escribir en un texto sin fuente da error y deja la página en blanco
+        holder.key = keyFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
         holder.key:SetText(info.key)
         if info.count then
             holder.count = holder:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
