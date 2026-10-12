@@ -124,6 +124,8 @@ ns.ACTION_BARS = {
     { key = "bar7", prefix = "MultiBar7Button", nameKey = "Action bar 8" },
     { key = "pet", prefix = "PetActionButton", nameKey = "Pet bar", noActionSlot = true },
     { key = "stance", prefix = "StanceButton", nameKey = "Stance bar", noActionSlot = true },
+    -- Botones de Bartender4, Dominos, ElvUI y otros addons de barras (se buscan aparte, sin prefijo fijo)
+    { key = "addons", nameKey = "Bars from other addons", tipKey = "Bartender4, Dominos, ElvUI and other action bar addons." },
 }
 
 -- Valores por defecto de cada perfil de estilo (cada clave es una opción del panel)
@@ -169,7 +171,7 @@ ns.PROFILE_DEFAULTS = {
     actionBarNumberColor = { 0.95, 0.91, 0.84, 1 },
     bars = {
         main = true, bottomLeft = true, bottomRight = true, right = true, left = true,
-        bar5 = true, bar6 = true, bar7 = true, pet = true, stance = true,
+        bar5 = true, bar6 = true, bar7 = true, pet = true, stance = true, addons = true,
     },
 
     -- Borde dorado cuando un cooldown está terminando
@@ -469,8 +471,11 @@ events:SetScript("OnEvent", function(_, event, arg1)
         ns.SelectProfileForSpec()
         C_Timer.After(1, ns.SkinAll)
     elseif event == "PLAYER_ENTERING_WORLD" then
-        -- Al cambiar de zona Blizzard rehace los iconos
-        C_Timer.After(1, ns.SkinAll)
+        -- Al cambiar de zona Blizzard rehace los iconos; los addons de barras pueden crear botones tarde
+        C_Timer.After(1, function()
+            ns.SkinAll()
+            ns.HookActionBars()
+        end)
     end
 end)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Comprueba las traducciones de Ruscuu CDM.
 
-- Cada frase que usa el código (L["..."] y las claves nameKey/labelKey/titleKey/descKey/textKey)
+- Cada frase que usa el código (L["..."] y las claves nameKey/labelKey/titleKey/descKey/textKey/tipKey)
   tiene traducción en todos los archivos de Locales/.
 - No sobran traducciones de frases que ya no se usan.
 - Cada traducción conserva los mismos marcadores de formato (%s, %d, %.1f, %%) en el mismo orden.
@@ -35,7 +35,7 @@ def used_keys():
         text = read(path)
         keys |= {unescape(k) for k in re.findall(r"\bL\[" + STRING + r"\]", text)}
         keys |= {unescape(k) for k in re.findall(
-            r"\b(?:nameKey|labelKey|titleKey|descKey|textKey)\s*=\s*" + STRING, text)}
+            r"\b(?:nameKey|labelKey|titleKey|descKey|textKey|tipKey)\s*=\s*" + STRING, text)}
         for title, desc in re.findall(r"CreatePage\(" + STRING + r",\s*" + STRING, text):
             keys |= {unescape(title), unescape(desc)}
     return keys

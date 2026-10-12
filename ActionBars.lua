@@ -9,7 +9,8 @@ local actionFont = CreateFont(FONT_NAME)
 -- Métodos con los que el juego arranca un cooldown; tras cada uno se reaplica la fuente
 local START_METHODS = { "SetCooldown", "SetCooldownDuration", "SetCooldownFromDurationObject", "SetCooldownUNIX" }
 
-local buttons = {}                                       -- cooldown -> { button, bar }
+local buttons = {}                                       -- cooldown -> { button, bar, noActionSlot }
+local buttonList = {}                                    -- los mismos datos en orden (barras de Blizzard primero)
 local hookedCount = 0
 local original = setmetatable({}, { __mode = "k" })     -- cooldown -> fuente original de Blizzard
 local styled = setmetatable({}, { __mode = "k" })       -- cooldown -> versión del estilo aplicada
@@ -79,6 +80,12 @@ end
 ------------------------------------------------------------------------
 
 local function ActionSlot(button)
+    -- Botones de LibActionButton (Bartender4, ElvUI): la acción está en _state_action
+    if button._state_type ~= nil then
+        local action = button._state_type == "action" and tonumber(button._state_action)
+        if action and action > 0 then return action end
+        return
+    end
     local action = button.action
     if not action and button.CalculateAction then action = button:CalculateAction() end
     if type(action) ~= "number" or action <= 0 then return end
@@ -131,24 +138,74 @@ function ns.StyleActionBars()
     UpdateExpireTracking()
 end
 
-function ns.HookActionBars()
-    for _, group in ipairs(ns.ACTION_BARS) do
-        for i = 1, 12 do
-            local button = _G[group.prefix .. i]
-            local cd = button and (button.cooldown or button.Cooldown)
-            if cd and not buttons[cd] then
-                buttons[cd] = { button = button, bar = group.key, noActionSlot = group.noActionSlot }
-                hookedCount = hookedCount + 1
-                -- El texto de la cuenta atrás puede crearse al empezar el primer cooldown
-                cd:HookScript("OnShow", Style)
-                for _, method in ipairs(START_METHODS) do
-                    if type(cd[method]) == "function" then
-                        hooksecurefunc(cd, method, Style)
-                    end
-                end
+local function HookButton(button, barKey, noActionSlot)
+    local cd = button and (button.cooldown or button.Cooldown)
+    if not cd or buttons[cd] or not cd.HookScript then return end
+    local info = { button = button, bar = barKey, noActionSlot = noActionSlot }
+    buttons[cd] = info
+    buttonList[#buttonList + 1] = info
+    hookedCount = hookedCount + 1
+    -- El texto de la cuenta atrás puede crearse al empezar el primer cooldown
+    cd:HookScript("OnShow", Style)
+    for _, method in ipairs(START_METHODS) do
+        if type(cd[method]) == "function" then
+            hooksecurefunc(cd, method, Style)
+        end
+    end
+end
+
+-- Botones de Blizzard que no son de las barras normales (no se tocan aunque usen la misma plantilla)
+local SKIPPED_BUTTONS = { "^ExtraActionButton", "^OverrideActionBarButton" }
+-- LibActionButton: la usan Bartender4 y otros; ElvUI lleva su propia copia
+local LAB_NAMES = { "LibActionButton-1.0", "LibActionButton-1.0-ElvUI" }
+local watchedLibraries = {}
+local rescanQueued = false
+
+local function QueueRescan()
+    if rescanQueued then return end
+    rescanQueued = true
+    C_Timer.After(0.2, function()
+        rescanQueued = false
+        ns.HookActionBars()
+    end)
+end
+
+local function HookAddonButtons()
+    for _, libName in ipairs(LAB_NAMES) do
+        local lab = LibStub and LibStub(libName, true)
+        if lab and lab.GetAllButtons then
+            for button in pairs(lab:GetAllButtons()) do HookButton(button, "addons") end
+            -- Botones creados más tarde (al añadir barras)
+            if not watchedLibraries[lab] and lab.RegisterCallback then
+                watchedLibraries[lab] = true
+                lab.RegisterCallback("RuscuuCDM", "OnButtonCreated", QueueRescan)
             end
         end
     end
+    -- Dominos y otros addons que usan la plantilla de botón de acción de Blizzard
+    local frames = ActionBarButtonEventsFrame and ActionBarButtonEventsFrame.frames
+    if type(frames) == "table" then
+        for _, button in pairs(frames) do
+            local name = button.GetName and button:GetName()
+            local skipped = not name
+            for _, pattern in ipairs(SKIPPED_BUTTONS) do
+                if name and name:find(pattern) then skipped = true end
+            end
+            if not skipped then HookButton(button, "addons") end
+        end
+    end
+end
+
+-- Se puede llamar varias veces: solo engancha los botones nuevos
+function ns.HookActionBars()
+    for _, group in ipairs(ns.ACTION_BARS) do
+        if group.prefix then
+            for i = 1, 12 do
+                HookButton(_G[group.prefix .. i], group.key, group.noActionSlot)
+            end
+        end
+    end
+    HookAddonButtons()
     ns.StyleActionBars()
 end
 

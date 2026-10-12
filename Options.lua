@@ -681,7 +681,7 @@ local function BuildActionBars(ui)
             function(on)
                 ns.db.bars[bar.key] = on
                 Apply()
-            end)
+            end, bar.tipKey and L[bar.tipKey])
         if col == 2 then ui:Next(28) end
     end
     if #ns.ACTION_BARS % 2 == 1 then ui:Next(28) end
