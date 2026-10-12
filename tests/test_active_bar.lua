@@ -3,7 +3,7 @@
 -- línea y un segundo con destello al terminar. Los iconos de esenciales y utilidad de Blizzard se ocultan.
 package.path = "tests/?.lua;" .. package.path
 local M = require("wowmock"); M.install()
-M.InstallCurves()
+local Duration = M.InstallCurves()
 
 local SECRET = { __secret = true }
 
@@ -12,7 +12,12 @@ local SECRET = { __secret = true }
 local spells = {}
 for _, id in ipairs({ 1, 2, 3, 4, 5, 22, 50 }) do spells[id] = { active = false, gcd = false } end
 local overrides = {}
-local function duration(id) return { spell = id } end
+-- Cooldowns con 2 s restantes: el borde dorado (3 s por defecto) se enciende
+local function duration(id)
+    local d = Duration(2)
+    d.spell = id
+    return d
+end
 local chargeDurations = {}
 C_Spell = {
     GetBaseSpell = function(id) return id end,
@@ -56,6 +61,7 @@ GameTooltip = M.CreateFrame("GameTooltip", "GameTooltip")
 local ns = {}
 M.Load(ns, "Locales.lua", "Core.lua", "Skin.lua", "ActiveCooldowns.lua")
 ns.db = ns.CopyTable(ns.PROFILE_DEFAULTS)
+ns.RebuildExpireCurve()
 ns.GetSpellHotkey = function(id) if id == 2 then return "Q" end end
 
 -- Barras de Blizzard: esenciales, utilidad (iconos al 75 %) y buffs (iconos)
@@ -128,6 +134,9 @@ spells[4].active = true
 update()
 assert(bar:IsShown(), "activado: la barra se ve")
 assert(bar:GetPoint(1) == "CENTER" and select(2, bar:GetPoint(1)) == essential, "la barra va en el centro de esenciales")
+essential:SetAlpha(0.6); M.Tick(0.2)
+assert(bar:GetAlpha() == 0.6, "con la opacidad de la barra de esenciales")
+essential:SetAlpha(1); M.Tick(0.2)
 for _, it in ipairs({ e1, e2, e3, u1, u2 }) do
     assert(not blizzardShown(it) and not it:IsMouseMotionEnabled(), "los iconos de Blizzard se ocultan")
 end
@@ -140,6 +149,14 @@ assert(f2.icon:IsDesaturated() and f2.cd._swipe == true, "en cooldown: gris y co
 assert(f2.icon._texture == 1002, "icono del hechizo")
 assert(f2.keyLabel:GetText() == "Q" and f2.keyLabel:IsShown(), "con su tecla")
 assert(not f2.count:IsShown(), "sin cargas no hay número")
+M.Tick(0.2)
+assert(M.ExpireBorder(f2), "borde dorado en la barra cuando el cooldown termina")
+ns.db.expireExclude[2] = true
+ns.RefreshActiveBar(); M.Tick(0.2)
+assert(not M.ExpireBorder(f2), "sin borde dorado si el hechizo está excluido")
+ns.db.expireExclude[2] = nil
+ns.RefreshActiveBar(); M.Tick(0.2)
+assert(M.ExpireBorder(f2), "el borde vuelve al incluirlo")
 
 -- A un cooldown real le queda menos que un GCD que empieza: el juego lo marca como GCD, pero no se oculta
 spells[4].gcd = true
@@ -288,7 +305,7 @@ assert(bar:IsShown() and b1:GetPoint(1) == "CENTER", "esenciales visibles: vuelv
 
 -- Modo de edición abierto: todo como Blizzard
 EditModeManagerFrame = { IsEditModeActive = function() return true end }
-update()
+M.Tick(0.2)
 assert(not bar:IsShown(), "modo de edición: sin barra")
 for _, it in ipairs({ e1, e2, e3, u1, u2, b1, b2 }) do
     assert(blizzardShown(it) and it:GetPoint(1) == "TOPLEFT", "modo de edición: todo como Blizzard")
@@ -296,8 +313,11 @@ for _, it in ipairs({ e1, e2, e3, u1, u2, b1, b2 }) do
 end
 assert(near(b1:GetScale(), 1), "modo de edición: escala de Blizzard")
 EditModeManagerFrame = nil
-update()
+M.Tick(0.2) -- sin avisos del juego: la barra tiene que volver a pedir el cooldown por sí sola
 assert(bar:IsShown() and not blizzardShown(e1), "al salir del modo de edición vuelve la barra")
+M.Tick(0.2)
+assert(icon("spell2").cd._cooldown and icon("spell2").cd._cooldown.duration.spell == 2 and M.ExpireBorder(icon("spell2")),
+    "al volver, el barrido y el borde dorado se vuelven a pedir al juego")
 
 -- Desactivar la opción lo devuelve todo como estaba
 ns.db.activeOnly = false

@@ -408,7 +408,7 @@ local function NewIcon()
     f:SetScript("OnEnter", ShowTooltip)
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- Borde dorado: el juego decide el color con el DurationObject del cooldown
-    ns.TrackExpire(f, f.icon, function() return f.duration end)
+    ns.TrackExpire(f, f.icon, function() return ns.ActiveIconDuration(f) end)
     f:Hide()
     return f
 end
@@ -465,6 +465,21 @@ local function UpdateTexture(f)
     f.icon:SetTexture(texture or 134400)
 end
 
+-- Duración del cooldown de un icono para el borde dorado: se pide al juego cada vez, como en los iconos
+-- de Blizzard (nil si no está en cooldown, si el hechizo está excluido o si el borde está apagado)
+function ns.ActiveIconDuration(f)
+    local kind = f.durationKind
+    if not kind then return end
+    if kind == "slot" then return f.slotDuration end
+    local ok, d
+    if kind == "charge" then
+        ok, d = pcall(C_Spell.GetSpellChargeDuration, f.spellID)
+    else
+        ok, d = GetCooldownDuration(f.spellID)
+    end
+    if ok then return d end
+end
+
 -- Barrido, cargas y borde dorado de un hechizo. Solo se toca cuando cambia algo (avisos del juego o estado),
 -- no en cada revisión. El aspecto imita al de Blizzard: con cargas restantes, solo el borde del barrido.
 local function ApplySpellCooldown(f, db, active, empty, recharging, isCharge)
@@ -483,7 +498,10 @@ local function ApplySpellCooldown(f, db, active, empty, recharging, isCharge)
     else
         f.cd:Clear()
     end
-    f.duration = (duration and ns.ExpireAllowed(f.entry.spell) and db.expireOnCDM) and duration or nil
+    f.durationKind = nil
+    if duration and ns.ExpireAllowed(f.entry.spell) and db.expireOnCDM then
+        f.durationKind = recharging and "charge" or "cooldown"
+    end
     local realCooldown = active and (empty or not isCharge)
     f.cd:SetDrawSwipe(db.showSwipe and realCooldown)
     if db.cooldownEdge == "blizzard" then
@@ -508,14 +526,16 @@ end
 local function ApplySlotCooldown(f, db, active, start, duration)
     if active then
         f.cd:SetCooldown(start, duration)
+        f.durationKind = nil
         if C_DurationUtil and C_DurationUtil.CreateDuration then
             f.slotDuration = f.slotDuration or C_DurationUtil.CreateDuration()
-            pcall(f.slotDuration.SetTimeFromStart, f.slotDuration, start, duration)
-            f.duration = db.expireOnCDM and f.slotDuration or nil
+            if pcall(f.slotDuration.SetTimeFromStart, f.slotDuration, start, duration) and db.expireOnCDM then
+                f.durationKind = "slot"
+            end
         end
     else
         f.cd:Clear()
-        f.duration = nil
+        f.durationKind = nil
     end
     f.cd:SetDrawSwipe(db.showSwipe)
     if db.cooldownEdge ~= "blizzard" then f.cd:SetDrawEdge(db.cooldownEdge == "show") end
@@ -552,12 +572,14 @@ local function RestoreAll()
         s.fitted = nil
     end
     for _, f in pairs(icons) do
-        f.wasActive, f.lingerUntil, f.duration = nil, nil, nil
+        -- Al volver se pide todo de nuevo al juego (barrido, cargas y borde dorado)
+        f.wasActive, f.lingerUntil, f.durationKind, f.style = nil, nil, nil, nil
+        f.cd:Clear()
         f.flash:Hide()
         f:Hide()
     end
     bar:Hide()
-    applied, lastLine = false, nil
+    applied, lastLine, cooldownsDirty, layoutDirty = false, nil, true, true
 end
 
 -- En el centro de la barra de esenciales (se mueve con ella en el modo de edición)
@@ -673,7 +695,8 @@ local function RebuildEntries()
     end
     for _, f in pairs(icons) do
         if not used[f] then
-            f.entry, f.wasActive, f.lingerUntil, f.duration = nil, nil, nil, nil
+            f.entry, f.wasActive, f.lingerUntil, f.durationKind, f.style = nil, nil, nil, nil, nil
+            f.cd:Clear()
             f.flash:Hide()
             f:Hide()
         end
@@ -704,6 +727,9 @@ local function Update()
         return
     end
     PlaceBar()
+    -- La misma opacidad que la barra de esenciales (se elige en el modo de edición)
+    local anchor = _G.EssentialCooldownViewer
+    bar:SetAlpha(anchor and Plain(anchor:GetAlpha()) or 1)
     bar:Show()
 
     local now = GetTime()
