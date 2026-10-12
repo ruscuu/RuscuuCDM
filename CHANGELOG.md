@@ -1,6 +1,15 @@
 # Changelog
 
-## v0.4.1
+## v0.5.0
+
+**New**
+- **Keybinds on Cooldown Manager icons**: each cooldown shows the key that casts it, taken from your action bars (also from form, stance and stealth bars). Customizable size, color, outline and corner. On by default.
+- **Border when a buff is about to end**, on the Cooldown Manager's buff icons and bars, with its own color and seconds (off by default). Like the golden border, the game decides when it shows: the addon never reads the remaining time.
+- **Bartender4, Dominos and ElvUI**: their action buttons get the styled numbers, the golden border and keybinds too (new "Bars from other addons" checkbox).
+- **Class color bars** option for the buff bars (the Class color theme turns it on).
+- **Type exact values** in the sliders, or use the mouse wheel over the value.
+- **Square minimaps** (Leatrix Plus, SexyMap…): the minimap button follows the square edge.
+- **New languages**: German, French, Portuguese and Russian.
 
 **Fixed**
 - The first time you opened an options page after logging in or `/reload`, it was blank until you went to another page and came back.

@@ -316,7 +316,7 @@ local function RebuildHotkeys()
         local visible = button:IsVisible()
         if not info.noActionSlot and visible == true then
             local action = ActionSlot(button)
-            if action and HasAction(action) then
+            if action and SlotHasAction(action) then
                 local spellID = ActionSpellID(action)
                 local text = spellID and ButtonHotkey(button)
                 if text then AddSpellHotkey(spellID, text) end
