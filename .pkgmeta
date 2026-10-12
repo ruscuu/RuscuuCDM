@@ -6,3 +6,4 @@ manual-changelog:
 
 ignore:
   - README.md
+  - tools

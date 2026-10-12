@@ -14,6 +14,7 @@
 ## AddonCompartmentFuncOnLeave: RuscuuCDM_OnAddonCompartmentLeave
 
 Locales.lua
+Locales\esES.lua
 Core.lua
 Profiles.lua
 Skin.lua

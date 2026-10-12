@@ -159,8 +159,8 @@ function Layout:Check(col, label, get, set, tip)
     cb.Text:SetJustifyH("LEFT")
     cb.Text:SetWordWrap(false)
     cb:SetHitRectInsets(0, -textWidth, 0, 0)
-    cb:SetScript("OnClick", function(self)
-        local on = self:GetChecked() and true or false
+    cb:SetScript("OnClick", function(button)
+        local on = button:GetChecked() and true or false
         PlayClick(on)
         set(on)
     end)
@@ -466,11 +466,9 @@ local function BuildGeneral(ui)
     ui:Next(32)
     ui:Dropdown(1, L["Language"],
         function()
-            return {
-                { value = "auto", text = L["Automatic (game language)"] },
-                { value = "en", text = "English" },
-                { value = "es", text = "Español" },
-            }
+            local list = { { value = "auto", text = L["Automatic (game language)"] } }
+            for _, lang in ipairs(ns.LANGUAGES) do list[#list + 1] = { value = lang.code, text = lang.name } end
+            return list
         end,
         function() return ns.global.language end,
         function(value)

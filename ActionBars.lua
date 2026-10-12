@@ -2,7 +2,6 @@
 -- Solo cambia fuente, tamaño y color del texto que dibuja el juego; nunca lee el tiempo restante.
 -- Al desactivarlo se restaura la fuente original de Blizzard sin recargar.
 local _, ns = ...
-local L = ns.L
 
 local FONT_NAME = "RuscuuCDMActionFont"
 local actionFont = CreateFont(FONT_NAME)
