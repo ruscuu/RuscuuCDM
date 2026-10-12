@@ -72,6 +72,6 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 
 ## Publishing / Publicación
 
-Every push and pull request runs the **Check** workflow: Lua syntax, `luacheck` and `tools/check_locales.py` (every text translated in every language). Run them locally with `luacheck .` and `python3 tools/check_locales.py`.
+Every push and pull request runs the **Check** workflow: Lua syntax, `luacheck`, `tools/check_locales.py` (every text translated in every language) and the tests in `tests/`, which load the addon with a small simulator of the WoW API (`tests/wowmock.lua`). Run them locally with `luacheck .`, `python3 tools/check_locales.py` and `sh tests/run.sh` (needs LuaJIT). They don't replace testing in the game.
 
 Pushing a tag like `v0.5.0` runs the GitHub Action that packages the addon and uploads it to CurseForge and GitHub Releases (and Wago if configured). Required repository secret: `CF_API_KEY` (and `WAGO_API_TOKEN` plus `## X-Wago-ID` in `RuscuuCDM.toc` for Wago).

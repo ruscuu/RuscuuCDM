@@ -1,4 +1,4 @@
-# Revisa el código en cada push y en cada Pull Request: sintaxis Lua, luacheck y traducciones.
+# Revisa el código en cada push y en cada Pull Request: sintaxis Lua, luacheck, traducciones y pruebas.
 name: Check
 
 on:
@@ -27,3 +27,6 @@ jobs:
 
       - name: Traducciones
         run: python3 tools/check_locales.py
+
+      - name: Pruebas con el simulador de WoW
+        run: sh tests/run.sh
