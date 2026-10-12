@@ -77,7 +77,14 @@ end
 
 local function SetHidden(item, hidden)
     local s = State(item)
-    if hidden == (s.hidden == true) then return end
+    if hidden == (s.hidden == true) then
+        -- Blizzard vuelve a activar la ayuda al reutilizar un icono (SetTooltipsShown): se apaga otra vez
+        if hidden and item:IsMouseMotionEnabled() == true then
+            s.mouse = true
+            item:SetMouseMotionEnabled(false)
+        end
+        return
+    end
     s.hidden = hidden
     if hidden then
         -- Invisible y sin ayuda al pasar el ratón (podría quedar debajo de un icono visible)
@@ -673,11 +680,17 @@ local function BuffSlot(item)
     return slot
 end
 
--- ¿Está activo un buff? Blizzard lo guarda en isActive (nunca secreto); si no, se mira si lo muestra
-local function BuffActive(item)
+-- ¿Está activo un buff? Blizzard lo guarda en isActive (casi nunca secreto). Si lo fuera: con "Ocultar si está
+-- inactivo" Blizzard solo muestra los activos; si no, se usa el último dato que se pudo leer.
+local function BuffActive(item, viewer)
+    local s = State(item)
     local active = item.isActive
-    if PlainBool(active) then return active end
-    return Shown(item)
+    if PlainBool(active) then
+        s.active = active
+        return active
+    end
+    if viewer.hideWhenInactive == true then return Shown(item) end
+    return s.active == true
 end
 
 local function RebuildEntries()
@@ -778,7 +791,7 @@ local function Update()
     -- Buffs del Cooldown Manager (iconos) en la misma línea, después de los cooldowns
     local buffsOn = db.activeBuffs and buffViewer ~= nil and Shown(buffViewer)
     for _, item in ipairs(ViewerItems(buffViewer)) do
-        if buffsOn and BuffActive(item) then
+        if buffsOn and BuffActive(item, buffViewer) then
             SetHidden(item, false)
             line[#line + 1] = BuffSlot(item)
         elseif buffsOn then
@@ -883,12 +896,13 @@ function ns.HookActiveViewer(viewer)
     end
     if not known then return end
     hooksecurefunc(viewer, "Layout", function()
-        if isBuffs then
+        -- Con la barra oculta Blizzard no coloca nada: las posiciones actuales son las del addon
+        if isBuffs and viewer:IsShown() == true then
             for _, item in ipairs(ns.GetViewerItems(viewer)) do
                 SavePoints(item)
                 SaveScale(item)
             end
-        else
+        elseif not isBuffs then
             entriesDirty = true
         end
         lastLine = nil

@@ -67,8 +67,9 @@ ns.GetSpellHotkey = function(id) if id == 2 then return "Q" end end
 -- Barras de Blizzard: esenciales, utilidad (iconos al 75 %) y buffs (iconos)
 local function viewer(name, scale)
     local v = M.CreateFrame("Frame", name)
-    -- Como Blizzard: coloca los iconos en fila desde la izquierda
+    -- Como Blizzard: coloca los iconos en fila desde la izquierda (si la barra está oculta, no hace nada)
     function v:Layout()
+        if not self:IsShown() then return end
         for _, item in ipairs(self._children) do
             item:ClearAllPoints()
             item:SetPoint("TOPLEFT", self, "TOPLEFT", (item.layoutIndex - 1) * 44, 0)
@@ -275,10 +276,22 @@ assert(near(b1:GetScale(), 1.25), "el buff se escala al tamaño de la barra: " .
 -- Dos iconos de 50 con 4 de separación -> 104: el cooldown a -27 y el buff a +27 (en sus unidades, /1,25)
 assert(near(x(icon("spell2")), -27), "cooldown a la izquierda: " .. x(icon("spell2")))
 assert(near(x(b1), 27 / 1.25), "buff a la derecha, en sus propias unidades: " .. x(b1))
+-- Blizzard reutiliza un icono oculto y le vuelve a activar la ayuda: se apaga otra vez
+b2:SetMouseMotionEnabled(true); e1:SetMouseMotionEnabled(true)
+M.Tick(0.2)
+assert(not b2:IsMouseMotionEnabled() and not e1:IsMouseMotionEnabled(), "los ocultos siguen sin ayuda")
+-- Si el juego ocultara isActive: con "Ocultar si está inactivo" manda lo que muestra Blizzard; si no, el último dato
+b1.isActive = SECRET
+M.Tick(0.2)
+assert(b1:GetPoint(1) == "CENTER" and blizzardShown(b1), "con isActive oculto se usa el último dato")
+b1.isActive = true
 -- Blizzard recoloca los buffs (y vuelve a poner su escala): la línea se rehace al momento
 b1:SetScale(1)
 buffs:Layout()
 assert(near(b1:GetScale(), 1.25) and near(x(b1), 27 / 1.25), "tras el Layout de Blizzard sigue en la línea")
+-- Con la barra de buffs oculta Blizzard no recoloca nada: no se guardan las posiciones del addon como suyas
+buffs:Hide(); buffs:Layout(); buffs:Show()
+M.Tick(0.2)
 -- Sin buffs en la línea: vuelven a su sitio de Blizzard
 ns.db.activeBuffs = false
 update()
