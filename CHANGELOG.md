@@ -1,10 +1,26 @@
 # Changelog
 
-## v0.3.1
+## v0.4.0
 
-- New option (on by default): **enable Blizzard's Cooldown Manager automatically** when you log in.
-- **Golden border when a cooldown is ending**, on action bar buttons and Cooldown Manager icons (last 3 seconds by default, configurable from 1 to 10 seconds and with custom color). Ignores the global cooldown and uses Blizzard's color curve API, so the addon never reads the remaining time.
-- More reliable action bar number styling.
+**New**
+- **Golden border when a cooldown is ending**, on action buttons and Cooldown Manager icons. Uses Blizzard's color curve API, so the addon never reads the remaining time. Customizable: last seconds (0.5–30 s), color with opacity, thickness, soft glow and its size, blink style (none / smooth pulse / flash), speed and depth. All borders blink in sync.
+- **Choose which spells get the golden border** (per profile).
+- **Choose which cooldowns are shown**: a button (and `/ruscuu cooldowns`, or Shift + click on the minimap button) opens Blizzard's Advanced Cooldown Settings, where you drag spells to "Not Displayed".
+- **Enable Blizzard's Cooldown Manager on install** (only once — if you turn it off later, the addon respects it).
+- New options for everything the addon changes: square icons, icon crop, class color border, swipe (show, color, edge, finish flash), bar texture (SharedMedia supported), bar color and background, font and outline for every text, charges and stacks size/color, buff bar text size, action bar number color/size/outline, which action bars are styled, minimap lock, chat messages and language.
+- **Live preview** in the options, a **Test for 5 seconds** button for the golden border, a **Defaults** button on every page, and help on every control.
+- New themes: **Class color** and **Blizzard style**. The current theme is highlighted.
+- Profiles: **Rename**, **Duplicate**, and a profile for characters without a specialization.
+
+**Fixed**
+- At login the Default profile was applied before your specialization's profile.
+- The golden border could become invisible (the extra GCD filter is gone: the game already ignores the global cooldown).
+- Blizzard's round frame was still drawn over square icons.
+- Turning an option off needed a reload; now everything goes back to Blizzard's look immediately.
+- The game's "Show numbers for cooldowns" setting was overwritten at every login; now you choose: always / never / leave the game setting.
+- Works on clients without the global `GetSpecialization` (uses `C_SpecializationInfo`).
+- "Reset" always resets the profile named in the dialog; `/ruscuu reset` asks for confirmation.
+- Imports with unknown fonts are rejected; a missing font falls back to the game font.
 
 ## v0.3.0
 

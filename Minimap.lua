@@ -9,15 +9,19 @@ local function ShowTooltip(owner)
     GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
     GameTooltip:AddLine("|cff9b4dffRuscuu|r Cooldown Manager Forever")
     GameTooltip:AddLine(L["Left-click: open options"], 1, 1, 1)
-    GameTooltip:AddLine(L["Right-click: reapply style"], 1, 1, 1)
-    GameTooltip:AddLine(L["Drag: move button"], 1, 1, 1)
+    GameTooltip:AddLine(L["Shift + left-click: choose which cooldowns are shown"], 1, 1, 1)
+    GameTooltip:AddLine(L["Right-click: preview the golden border"], 1, 1, 1)
+    if not ns.global.minimap.lock then
+        GameTooltip:AddLine(L["Drag: move button"], 1, 1, 1)
+    end
     GameTooltip:Show()
 end
 
 local function OnClick(mouseButton)
     if mouseButton == "RightButton" then
-        ns.SkinAll()
-        ns.Print(L["Style reapplied."])
+        ns.TestExpire(5)
+    elseif IsShiftKeyDown() then
+        ns.OpenCooldownSettings()
     else
         ns.OpenOptions()
     end
@@ -76,6 +80,7 @@ function ns.CreateMinimapButton()
     button:SetScript("OnEnter", ShowTooltip)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
     button:SetScript("OnDragStart", function(self)
+        if ns.global.minimap.lock then return end
         GameTooltip:Hide()
         self:SetScript("OnUpdate", OnDragUpdate)
     end)
@@ -90,8 +95,15 @@ function ns.SetMinimapShown(shown)
     if button then button:SetShown(shown) end
 end
 
--- Llamadas desde el menú de addons del minimapa (declaradas en el .toc)
-function RuscuuCDM_OnAddonCompartmentClick(_, mouseButton)
+function ns.SetMinimapLocked(locked)
+    ns.global.minimap.lock = locked
+end
+
+-- Llamadas desde el menú de addons del minimapa (declaradas en el .toc).
+-- Según la versión del juego, el segundo argumento es el botón del ratón o una tabla que lo contiene.
+function RuscuuCDM_OnAddonCompartmentClick(_, input)
+    local mouseButton = input
+    if type(input) == "table" then mouseButton = input.buttonName end
     OnClick(mouseButton)
 end
 

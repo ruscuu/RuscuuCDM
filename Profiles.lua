@@ -12,6 +12,7 @@ local function CharData()
     local key = UnitName("player") .. "-" .. GetRealmName()
     local chars = ns.global.chars
     chars[key] = chars[key] or { specs = {} }
+    chars[key].specs = chars[key].specs or {}
     return chars[key]
 end
 
@@ -20,6 +21,7 @@ function ns.UseProfile(name)
     local profiles = ns.global.profiles
     if not profiles[name] then name = "Default" end
     profiles[name] = profiles[name] or {}
+    ns.MigrateProfile(profiles[name])
     ns.ApplyDefaults(profiles[name], ns.PROFILE_DEFAULTS)
     ns.db = profiles[name]
     ns.activeProfile = name
@@ -30,7 +32,6 @@ function ns.RefreshAll()
     ns.UpdateExpire()
     ns.SkinAll()
     ns.StyleActionBars()
-    ns.ApplyActionBarNumbers()
     if ns.RefreshOptions then ns.RefreshOptions() end
 end
 
@@ -39,14 +40,17 @@ function ns.SetProfile(name)
     ns.RefreshAll()
 end
 
+-- Perfil de una especialización; sin especialización (personajes de nivel bajo) se usa noSpec
 function ns.ProfileForSpec(specIndex)
-    local name = specIndex and CharData().specs[specIndex]
+    local char = CharData()
+    local name
+    if specIndex then name = char.specs[specIndex] else name = char.noSpec end
     if name and ns.global.profiles[name] then return name end
     return "Default"
 end
 
 function ns.SelectProfileForSpec()
-    local name = ns.ProfileForSpec(GetSpecialization())
+    local name = ns.ProfileForSpec(ns.GetSpec())
     if name ~= ns.activeProfile then
         ns.SetProfile(name)
         ns.Print(L["Active profile: %s"]:format(name))
@@ -55,7 +59,7 @@ end
 
 function ns.AssignSpecProfile(specIndex, name)
     CharData().specs[specIndex] = name
-    if specIndex == GetSpecialization() then
+    if specIndex == ns.GetSpec() then
         ns.SetProfile(name)
     elseif ns.RefreshOptions then
         ns.RefreshOptions()
@@ -64,10 +68,11 @@ end
 
 -- Elegir un perfil desde las opciones lo asigna también a la especialización actual
 function ns.ChooseProfile(name)
-    local spec = GetSpecialization()
+    local spec = ns.GetSpec()
     if spec then
         ns.AssignSpecProfile(spec, name)
     else
+        CharData().noSpec = name
         ns.SetProfile(name)
     end
 end
@@ -82,24 +87,47 @@ end
 function ns.CreateProfile(name, copyFrom)
     local profiles = ns.global.profiles
     if profiles[name] then
-        ns.Print(L["A profile with that name already exists."])
+        ns.Print(L["A profile with that name already exists."], true)
         return
     end
     profiles[name] = copyFrom and profiles[copyFrom] and ns.CopyTable(profiles[copyFrom]) or {}
     ns.ChooseProfile(name)
 end
 
+function ns.RenameProfile(old, new)
+    local profiles = ns.global.profiles
+    if old == "Default" then
+        ns.Print(L["The Default profile cannot be renamed."], true)
+        return
+    end
+    if not profiles[old] or new == "" or new == old then return end
+    if profiles[new] then
+        ns.Print(L["A profile with that name already exists."], true)
+        return
+    end
+    profiles[new], profiles[old] = profiles[old], nil
+    for _, char in pairs(ns.global.chars) do
+        for spec, profile in pairs(char.specs or {}) do
+            if profile == old then char.specs[spec] = new end
+        end
+        if char.noSpec == old then char.noSpec = new end
+    end
+    if ns.activeProfile == old then ns.activeProfile = new end
+    if ns.RefreshOptions then ns.RefreshOptions() end
+end
+
 function ns.DeleteProfile(name)
     if name == "Default" then
-        ns.Print(L["The Default profile cannot be deleted."])
+        ns.Print(L["The Default profile cannot be deleted."], true)
         return
     end
     ns.global.profiles[name] = nil
     -- Las especializaciones que usaban ese perfil vuelven a Default
     for _, char in pairs(ns.global.chars) do
-        for spec, profile in pairs(char.specs) do
+        for spec, profile in pairs(char.specs or {}) do
             if profile == name then char.specs[spec] = nil end
         end
+        if char.noSpec == name then char.noSpec = nil end
     end
     if ns.activeProfile == name then
         ns.SetProfile("Default")
@@ -108,9 +136,30 @@ function ns.DeleteProfile(name)
     end
 end
 
-function ns.ResetProfile()
-    wipe(ns.db)
-    ns.SetProfile(ns.activeProfile)
+-- Restablece el perfil indicado (no "el que esté activo al pulsar Sí")
+function ns.ResetProfile(name)
+    name = name or ns.activeProfile
+    local profile = ns.global.profiles[name]
+    if not profile then return end
+    wipe(profile)
+    if name == ns.activeProfile then
+        ns.SetProfile(name)
+    else
+        ns.ApplyDefaults(profile, ns.PROFILE_DEFAULTS)
+    end
+end
+
+-- Restablece solo algunas opciones del perfil activo (botón "Valores por defecto" de cada página)
+function ns.ResetKeys(keys)
+    for _, key in ipairs(keys) do
+        local def = ns.PROFILE_DEFAULTS[key]
+        if type(def) == "table" then
+            ns.db[key] = ns.CopyTable(def)
+        else
+            ns.db[key] = def
+        end
+    end
+    ns.RefreshAll()
 end
 
 ------------------------------------------------------------------------
@@ -119,54 +168,94 @@ end
 
 ns.THEMES = {
     {
-        name = L["Ruscuu Neon"],
+        nameKey = "Ruscuu Neon",
         values = {
-            borderSize = 2, iconZoom = 0.08,
+            squareIcons = true, borderSize = 2, iconZoom = 0.08, borderClassColor = false,
             borderColor = { 0.61, 0.30, 1.00, 1 }, barColor = { 0.55, 0.25, 0.95, 1 },
-            bgColor = { 0.07, 0.03, 0.12, 0.85 }, numberColor = { 0.95, 0.91, 0.84, 1 },
+            bgColor = { 0.07, 0.03, 0.12, 0.85 }, swipeColor = { 0.08, 0, 0.15, 0.75 },
+            numberColor = { 0.95, 0.91, 0.84, 1 }, actionBarNumberColor = { 0.95, 0.91, 0.84, 1 },
+            expireColor = { 1, 0.82, 0, 1 },
         },
     },
     {
-        name = L["Minimal"],
+        nameKey = "Minimal",
         values = {
-            borderSize = 1, iconZoom = 0.10,
+            squareIcons = true, borderSize = 1, iconZoom = 0.10, borderClassColor = false,
             borderColor = { 0, 0, 0, 1 }, barColor = { 0.80, 0.80, 0.80, 1 },
-            bgColor = { 0, 0, 0, 0.60 }, numberColor = { 1, 1, 1, 1 },
+            bgColor = { 0, 0, 0, 0.60 }, swipeColor = { 0, 0, 0, 0.7 },
+            numberColor = { 1, 1, 1, 1 }, actionBarNumberColor = { 1, 1, 1, 1 },
+            expireColor = { 1, 1, 1, 1 },
         },
     },
     {
-        name = L["Dark"],
+        nameKey = "Dark",
         values = {
-            borderSize = 1, iconZoom = 0.08,
+            squareIcons = true, borderSize = 1, iconZoom = 0.08, borderClassColor = false,
             borderColor = { 0.25, 0.22, 0.30, 1 }, barColor = { 0.35, 0.30, 0.45, 1 },
-            bgColor = { 0.05, 0.05, 0.07, 0.90 }, numberColor = { 0.85, 0.85, 0.85, 1 },
+            bgColor = { 0.05, 0.05, 0.07, 0.90 }, swipeColor = { 0, 0, 0, 0.85 },
+            numberColor = { 0.85, 0.85, 0.85, 1 }, actionBarNumberColor = { 0.85, 0.85, 0.85, 1 },
+            expireColor = { 1, 0.82, 0, 1 },
         },
     },
     {
-        name = L["Classic"],
+        nameKey = "Class color",
         values = {
-            borderSize = 1, iconZoom = 0.06,
-            borderColor = { 0.85, 0.70, 0.30, 1 }, barColor = { 1, 0.70, 0, 1 },
-            bgColor = { 0, 0, 0, 0.50 }, numberColor = { 1, 0.82, 0, 1 },
+            squareIcons = true, borderSize = 2, iconZoom = 0.08, borderClassColor = true,
+            barColor = { 0.55, 0.25, 0.95, 1 }, bgColor = { 0, 0, 0, 0.7 }, swipeColor = { 0, 0, 0, 0.75 },
+            numberColor = { 1, 1, 1, 1 }, actionBarNumberColor = { 1, 1, 1, 1 },
+            expireColor = { 1, 0.82, 0, 1 },
+        },
+    },
+    {
+        nameKey = "Blizzard style",
+        values = {
+            squareIcons = false, borderSize = 0, iconZoom = 0, borderClassColor = false,
+            barColor = { 1, 0.5, 0.25, 1 }, bgColor = { 0, 0, 0, 0.5 }, swipeColor = { 0, 0, 0, 0.7 },
+            numberColor = { 1, 1, 1, 1 }, actionBarNumberColor = { 1, 1, 1, 1 },
+            expireColor = { 1, 0.82, 0, 1 },
         },
     },
 }
+
+-- Si los valores del perfil coinciden con un tema, devuelve ese tema (para marcarlo en las opciones)
+function ns.CurrentTheme()
+    for _, theme in ipairs(ns.THEMES) do
+        local same = true
+        for k, v in pairs(theme.values) do
+            local cur = ns.db[k]
+            if type(v) == "table" then
+                if type(cur) ~= "table" then
+                    same = false
+                else
+                    for i = 1, 4 do
+                        if math.abs((cur[i] or 1) - (v[i] or 1)) > 0.01 then same = false end
+                    end
+                end
+            elseif cur ~= v then
+                same = false
+            end
+            if not same then break end
+        end
+        if same then return theme end
+    end
+end
 
 function ns.ApplyTheme(theme)
     for k, v in pairs(theme.values) do
         ns.db[k] = type(v) == "table" and ns.CopyTable(v) or v
     end
     ns.RefreshAll()
-    ns.Print(L["Theme applied: %s"]:format(theme.name))
+    ns.Print(L["Theme applied: %s"]:format(L[theme.nameKey]))
 end
 
 ------------------------------------------------------------------------
 -- Importar / exportar: "!RUSCUU:1!" + base64 de "clave=valor;clave=valor"
--- La importación nunca ejecuta código: solo acepta claves conocidas con el tipo esperado.
+-- La importación nunca ejecuta código: solo acepta claves conocidas con el tipo y rango esperados.
 ------------------------------------------------------------------------
 
 local PREFIX = "!RUSCUU:1!"
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local SPELL_SET_KEYS = { expireExclude = true } -- conjuntos de hechizos: se exportan como "123,456"
 
 local function B64Char(n)
     return B64:sub(n + 1, n + 1)
@@ -214,10 +303,18 @@ end
 local function Flatten(defaults, values, prefix, out)
     for k, def in pairs(defaults) do
         local key, v = prefix .. k, values[k]
-        if IsColor(def) then
+        if SPELL_SET_KEYS[key] then
+            local ids = {}
+            for id, on in pairs(v or {}) do
+                if on and tonumber(id) then ids[#ids + 1] = tostring(id) end
+            end
+            table.sort(ids)
+            out[#out + 1] = key .. "=" .. table.concat(ids, ",")
+        elseif IsColor(def) then
+            v = type(v) == "table" and v or def
             out[#out + 1] = ("%s=%.3f,%.3f,%.3f,%.3f"):format(key, v[1], v[2], v[3], v[4] or 1)
         elseif type(def) == "table" then
-            Flatten(def, v, key .. ".", out)
+            Flatten(def, type(v) == "table" and v or {}, key .. ".", out)
         elseif type(def) == "boolean" then
             out[#out + 1] = key .. "=" .. (v and "1" or "0")
         else
@@ -237,8 +334,15 @@ local function Clamp(n, low, high)
     return math.max(low, math.min(high, n))
 end
 
--- Escribe un valor importado si la clave existe en los valores por defecto y el tipo coincide
+-- Escribe un valor importado si la clave existe en los valores por defecto y el valor es válido
 local function ImportValue(target, key, raw)
+    if SPELL_SET_KEYS[key] then
+        if not raw:match("^[%d,]*$") then return false end
+        local set = {}
+        for id in raw:gmatch("%d+") do set[tonumber(id)] = true end
+        target[key] = set
+        return true
+    end
     local defaults = ns.PROFILE_DEFAULTS
     local parts = { strsplit(".", key) }
     for i = 1, #parts - 1 do
@@ -261,8 +365,15 @@ local function ImportValue(target, key, raw)
         local limits = ns.LIMITS[k]
         target[k] = limits and Clamp(n, limits[1], limits[2]) or n
     elseif type(def) == "string" then
-        -- Solo rutas de archivo sencillas (fuentes del juego o de otros addons)
-        if not raw:match("^[%w_%.%-\\/]+$") then return false end
+        if ns.CHOICES[k] then
+            if not ns.CHOICES[k][raw] then return false end
+        elseif k == "font" then
+            if not ns.IsKnownFont(raw) then return false end
+        elseif k == "barTexture" then
+            if not ns.IsKnownBarTexture(raw) then return false end
+        else
+            return false
+        end
         target[k] = raw
     else
         return false
@@ -286,5 +397,5 @@ function ns.ImportProfile(text)
     wipe(ns.db)
     for k, v in pairs(imported) do ns.db[k] = v end
     ns.RefreshAll()
-    return true
+    return true, count
 end
