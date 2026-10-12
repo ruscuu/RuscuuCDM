@@ -76,6 +76,7 @@ L["Action bar cooldowns hooked: %d"] = "Отслеживаемых восста�
 L["Cooldown Manager enabled: %s"] = "Cooldown Manager включён: %s"
 L["Golden border: curve API %s, buttons %d, cooldowns read %d"] = "Золотая рамка: API кривых %s, кнопок %d, прочитано восстановлений %d"
 L["Buffs about to end: aura API %s"] = "Заканчивающиеся баффы: API аур %s"
+L["Active cooldowns: cooldown state %s"] = "Активные восстановления: состояние восстановления %s"
 L["Active profile: %s"] = "Активный профиль: %s"
 
 -- Botón del minimapa
@@ -140,6 +141,12 @@ L["Reset everything"] = "Сбросить всё"
 L["Deletes all profiles and settings of the addon and reloads the interface."] = "Удаляет все профили и настройки аддона и перезагружает интерфейс."
 
 -- Página Cooldown Manager
+L["Active cooldowns"] = "Активные восстановления"
+L["Hides the cooldowns that are ready and shows the ones on cooldown, essential and utility together, in one line centered where the essential cooldowns are."] = "Скрывает готовые восстановления и показывает идущие — основные и вспомогательные вместе — в одну линию по центру на месте основных."
+L["Only active cooldowns"] = "Только активные восстановления"
+L["The global cooldown doesn't count. While Edit Mode or Blizzard's cooldown settings are open, everything is shown as usual."] = "Глобальное восстановление не учитывается. Пока открыт режим редактирования или настройки восстановлений Blizzard, всё отображается как обычно."
+L["Flash when ready"] = "Вспышка при готовности"
+L["When a cooldown ends, its icon stays one second with a flash before hiding."] = "Когда восстановление заканчивается, значок остаётся на секунду со вспышкой, а затем скрывается."
 L["Apply style to"] = "Применять стиль к"
 L["When unchecked, this viewer goes back to Blizzard's look immediately."] = "Если снять флажок, эта панель сразу вернётся к виду Blizzard."
 L["Icons"] = "Значки"

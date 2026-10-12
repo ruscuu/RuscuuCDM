@@ -54,6 +54,17 @@ function Object:SetFont(file, size, flags) self._font = { file, size, flags }; s
 function Object:GetFont() if self._font then return unpack(self._font) end return "Fonts\\FRIZQT__.TTF", 12, "" end
 function Object:SetVertexColor(r, g, b, a) self._vertex = { r, g, b, a } end
 function Object:SetAlpha(a) self._alpha = a end
+function Object:GetAlpha() return self._alpha or 1 end
+function Object:SetScale(scale) self._scale = scale end
+function Object:GetScale() return self._scale or 1 end
+function Object:GetEffectiveScale()
+    local scale, f = 1, self
+    while f do scale = scale * (f._scale or 1); f = f._parent end
+    return scale
+end
+function Object:SetMouseMotionEnabled(on) self._mouseMotion = on and true or false end
+function Object:IsMouseMotionEnabled() return self._mouseMotion ~= false end
+function Object:GetNumPoints() return self._points and #self._points or 0 end
 function Object:SetTextColor(r, g, b, a) self._color = { r, g, b, a } end
 function Object:GetTextColor() if self._color then return unpack(self._color) end return 1, 1, 1, 1 end
 function Object:SetPoint(...) self._points = self._points or {}; self._points[#self._points + 1] = { ... } end

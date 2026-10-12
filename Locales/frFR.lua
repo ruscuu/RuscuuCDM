@@ -76,6 +76,7 @@ L["Action bar cooldowns hooked: %d"] = "Temps de recharge des barres d’action 
 L["Cooldown Manager enabled: %s"] = "Cooldown Manager activé : %s"
 L["Golden border: curve API %s, buttons %d, cooldowns read %d"] = "Bordure dorée : API de courbes %s, boutons %d, temps de recharge lus %d"
 L["Buffs about to end: aura API %s"] = "Améliorations sur le point d’expirer : API des auras %s"
+L["Active cooldowns: cooldown state %s"] = "Temps de recharge actifs : état du temps de recharge %s"
 L["Active profile: %s"] = "Profil actif : %s"
 
 -- Botón del minimapa
@@ -140,6 +141,12 @@ L["Reset everything"] = "Tout réinitialiser"
 L["Deletes all profiles and settings of the addon and reloads the interface."] = "Supprime tous les profils et réglages de l’addon et recharge l’interface."
 
 -- Página Cooldown Manager
+L["Active cooldowns"] = "Temps de recharge actifs"
+L["Hides the cooldowns that are ready and shows the ones on cooldown, essential and utility together, in one line centered where the essential cooldowns are."] = "Masque les temps de recharge prêts et affiche ceux en cours, essentiels et utilitaires ensemble, sur une ligne centrée à l’emplacement des essentiels."
+L["Only active cooldowns"] = "Seulement les recharges actives"
+L["The global cooldown doesn't count. While Edit Mode or Blizzard's cooldown settings are open, everything is shown as usual."] = "Le temps de recharge global ne compte pas. Tant que le mode Édition ou les réglages des temps de recharge de Blizzard sont ouverts, tout s’affiche normalement."
+L["Flash when ready"] = "Flash quand c’est prêt"
+L["When a cooldown ends, its icon stays one second with a flash before hiding."] = "À la fin d’un temps de recharge, son icône reste une seconde avec un flash avant de disparaître."
 L["Apply style to"] = "Appliquer le style à"
 L["When unchecked, this viewer goes back to Blizzard's look immediately."] = "Une fois décoché, cet affichage reprend immédiatement l’apparence de Blizzard."
 L["Icons"] = "Icônes"

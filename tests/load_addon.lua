@@ -50,6 +50,13 @@ assert(near(ns.db.expireSeconds, 3.5), "coma decimal y ajuste al paso: " .. tost
 seconds:SetFocus(); seconds:SetText("9"); seconds:Fire("OnEscapePressed")
 assert(near(ns.db.expireSeconds, 3.5) and seconds:GetText() == "3.5 s", "Escape descarta lo escrito")
 
+-- Modo "solo cooldowns activos" con el addon completo: se activa y se desactiva sin errores
+ns.db.activeOnly = true
+M.FireEvent("SPELL_UPDATE_COOLDOWN")
+M.Tick(0.2)
+ns.db.activeOnly = false
+M.Tick(0.2)
+
 -- Exportar e importar conserva las opciones nuevas
 local text = ns.ExportProfile()
 ns.db.keybindAnchor = "BOTTOMLEFT"; ns.db.buffEndGlow = true; ns.db.bars.addons = false

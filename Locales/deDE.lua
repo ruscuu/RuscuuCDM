@@ -76,6 +76,7 @@ L["Action bar cooldowns hooked: %d"] = "Verknüpfte Abklingzeiten der Aktionslei
 L["Cooldown Manager enabled: %s"] = "Cooldown Manager aktiviert: %s"
 L["Golden border: curve API %s, buttons %d, cooldowns read %d"] = "Goldener Rahmen: Kurven-API %s, Schaltflächen %d, gelesene Abklingzeiten %d"
 L["Buffs about to end: aura API %s"] = "Auslaufende Buffs: Auren-API %s"
+L["Active cooldowns: cooldown state %s"] = "Aktive Abklingzeiten: Abklingzeit-Status %s"
 L["Active profile: %s"] = "Aktives Profil: %s"
 
 -- Botón del minimapa
@@ -140,6 +141,12 @@ L["Reset everything"] = "Alles zurücksetzen"
 L["Deletes all profiles and settings of the addon and reloads the interface."] = "Löscht alle Profile und Einstellungen des Addons und lädt das Interface neu."
 
 -- Página Cooldown Manager
+L["Active cooldowns"] = "Aktive Abklingzeiten"
+L["Hides the cooldowns that are ready and shows the ones on cooldown, essential and utility together, in one line centered where the essential cooldowns are."] = "Blendet bereite Abklingzeiten aus und zeigt die laufenden, wichtige und nützliche zusammen, in einer Zeile, zentriert an der Position der wichtigen Abklingzeiten."
+L["Only active cooldowns"] = "Nur aktive Abklingzeiten"
+L["The global cooldown doesn't count. While Edit Mode or Blizzard's cooldown settings are open, everything is shown as usual."] = "Die globale Abklingzeit zählt nicht. Solange der Bearbeitungsmodus oder die Abklingzeit-Einstellungen von Blizzard offen sind, wird alles wie gewohnt angezeigt."
+L["Flash when ready"] = "Aufblitzen, wenn bereit"
+L["When a cooldown ends, its icon stays one second with a flash before hiding."] = "Wenn eine Abklingzeit endet, bleibt ihr Symbol eine Sekunde mit einem Aufblitzen sichtbar, bevor es verschwindet."
 L["Apply style to"] = "Stil anwenden auf"
 L["When unchecked, this viewer goes back to Blizzard's look immediately."] = "Ohne Haken erhält diese Anzeige sofort wieder das Aussehen von Blizzard."
 L["Icons"] = "Symbole"

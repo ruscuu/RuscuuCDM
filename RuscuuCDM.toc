@@ -26,6 +26,7 @@ Locales\ruRU.lua
 Core.lua
 Profiles.lua
 Skin.lua
+ActiveCooldowns.lua
 Minimap.lua
 ActionBars.lua
 Options.lua

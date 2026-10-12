@@ -76,6 +76,7 @@ L["Action bar cooldowns hooked: %d"] = "Contadores de barras de acción engancha
 L["Cooldown Manager enabled: %s"] = "Cooldown Manager activado: %s"
 L["Golden border: curve API %s, buttons %d, cooldowns read %d"] = "Borde dorado: API de curvas %s, botones %d, cooldowns leídos %d"
 L["Buffs about to end: aura API %s"] = "Buffs a punto de terminar: API de auras %s"
+L["Active cooldowns: cooldown state %s"] = "Cooldowns activos: estado del cooldown %s"
 L["Active profile: %s"] = "Perfil activo: %s"
 
 -- Botón del minimapa
@@ -140,6 +141,12 @@ L["Reset everything"] = "Restablecer todo"
 L["Deletes all profiles and settings of the addon and reloads the interface."] = "Borra todos los perfiles y ajustes del addon y recarga la interfaz."
 
 -- Página Cooldown Manager
+L["Active cooldowns"] = "Cooldowns activos"
+L["Hides the cooldowns that are ready and shows the ones on cooldown, essential and utility together, in one line centered where the essential cooldowns are."] = "Oculta los cooldowns que están listos y muestra los que están en cooldown, esenciales y de utilidad juntos, en una línea centrada donde está la barra de esenciales."
+L["Only active cooldowns"] = "Solo cooldowns activos"
+L["The global cooldown doesn't count. While Edit Mode or Blizzard's cooldown settings are open, everything is shown as usual."] = "El tiempo de reutilización global no cuenta. Mientras están abiertos el modo de edición o los ajustes de cooldowns de Blizzard, todo se ve como siempre."
+L["Flash when ready"] = "Destello al estar listo"
+L["When a cooldown ends, its icon stays one second with a flash before hiding."] = "Cuando termina un cooldown, su icono se queda un segundo con un destello antes de ocultarse."
 L["Apply style to"] = "Aplicar estilo a"
 L["When unchecked, this viewer goes back to Blizzard's look immediately."] = "Al desmarcarlo, este visor vuelve al aspecto de Blizzard al momento."
 L["Icons"] = "Iconos"

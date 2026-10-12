@@ -53,6 +53,7 @@ return function(clientLocale)
     item.Icon = item:CreateTexture()
     item.Cooldown = M.CreateFrame("Cooldown", nil, item)
     item.GetBaseSpellID = function() return 100 end
+    item.layoutIndex = 1
     for i = 1, 12 do
         local button = M.NewActionButton("ActionButton" .. i, i)
         button.bindingAction = "ACTIONBUTTON" .. i

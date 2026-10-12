@@ -605,6 +605,15 @@ local function BuildCooldownManager(ui)
         if col == 2 then ui:Next(30) end
     end
 
+    ui:Section(L["Active cooldowns"])
+    local _, h = ui:Note(L["Hides the cooldowns that are ready and shows the ones on cooldown, essential and utility together, in one line centered where the essential cooldowns are."])
+    ui:Next(h)
+    ui:DBCheck(1, L["Only active cooldowns"], "activeOnly",
+        L["The global cooldown doesn't count. While Edit Mode or Blizzard's cooldown settings are open, everything is shown as usual."])
+    ui:DBCheck(2, L["Flash when ready"], "activeFlash",
+        L["When a cooldown ends, its icon stays one second with a flash before hiding."])
+    ui:Next(32)
+
     ui:Section(L["Icons"])
     ui:DBCheck(1, L["Square icons"], "squareIcons",
         L["Removes Blizzard's round mask and frame so icons are square."])
@@ -1115,7 +1124,7 @@ local SUBPAGES = {
     {
         key = "cdm", titleKey = "Cooldown Manager", descKey = "Icons, borders, swipe and buff bars.",
         build = BuildCooldownManager,
-        resetKeys = { "enabled", "squareIcons", "iconZoom", "borderSize", "borderColor", "borderClassColor",
+        resetKeys = { "enabled", "activeOnly", "activeFlash", "squareIcons", "iconZoom", "borderSize", "borderColor", "borderClassColor",
             "showSwipe", "swipeColor", "cooldownEdge", "cooldownBling", "barTexture", "barColor", "barClassColor", "bgColor" },
     },
     {

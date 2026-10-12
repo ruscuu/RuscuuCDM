@@ -146,6 +146,10 @@ ns.PROFILE_DEFAULTS = {
     cooldownEdge = "blizzard",                -- línea brillante del barrido: blizzard | show | hide
     cooldownBling = "blizzard",               -- destello al terminar: blizzard | show | hide
 
+    -- Solo los cooldowns activos, en una línea centrada (esenciales y utilidad juntos)
+    activeOnly = false,
+    activeFlash = true,                       -- al terminar, el icono se queda un segundo con un destello
+
     -- Barras de buffs
     barTexture = "flat",
     barColor = { 0.55, 0.25, 0.95, 1 },
@@ -586,6 +590,7 @@ function ns.GetStatus()
         expireReads = ns.CountExpireReads(),
         expireBroken = ns.IsExpireBroken(),
         auraAPI = ns.HasAuraDurationAPI(),
+        activeAPI = ns.ActiveCooldownAPI(),
     }
 end
 
@@ -603,5 +608,6 @@ function ns.Debug()
         s.curveAPI and yes or no, s.expireTracked, s.expireReads)
         .. (s.expireBroken and " |cffff5555(" .. L["disabled"] .. ")|r" or ""), true)
     ns.Print(L["Buffs about to end: aura API %s"]:format(s.auraAPI and yes or no), true)
+    ns.Print(L["Active cooldowns: cooldown state %s"]:format(s.activeAPI == nil and "?" or (s.activeAPI and yes or no)), true)
     ns.Print(L["Active profile: %s"]:format(ns.activeProfile), true)
 end

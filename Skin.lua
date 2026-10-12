@@ -622,6 +622,7 @@ local function ViewerItemSpell(item)
     if not spellID or ns.IsSecret(spellID) then return end
     return spellID
 end
+ns.ViewerItemSpell = ViewerItemSpell
 
 local function ViewerItemDuration(item)
     local spellID = ViewerItemSpell(item)
@@ -679,6 +680,8 @@ end
 function ns.CountViewerItems(viewer)
     return #ItemFrames(viewer)
 end
+
+ns.GetViewerItems = ItemFrames
 
 -- Hechizos de los cooldowns visibles en el Cooldown Manager (para la lista del borde dorado)
 function ns.GetViewerSpells()
@@ -781,6 +784,7 @@ function ns.HookViewers()
                 end
             end
             viewer:HookScript("OnShow", queue)
+            if ns.HookActiveViewer then ns.HookActiveViewer(viewer) end
             queue()
         end
     end

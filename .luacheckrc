@@ -27,7 +27,7 @@ read_globals = {
 
     -- Funciones
     "CreateColor", "CreateFont", "CreateFrame", "GetActionInfo", "GetBindingKey", "GetBindingText",
-    "GetCursorPosition", "GetLocale", "GetMinimapShape", "GetNumSpecializations", "GetPrimaryTalentTree",
+    "GetCursorPosition", "GetInventoryItemCooldown", "GetLocale", "GetMinimapShape", "GetNumSpecializations", "GetPrimaryTalentTree",
     "GetRealmName", "geterrorhandler", "GetSpecialization", "GetSpecializationInfo", "GetSpecializationInfoForClassID",
     "GetTime", "HasAction", "hooksecurefunc", "InCombatLockdown", "IsLoggedIn", "IsShiftKeyDown",
     "issecretvalue", "LibStub", "PlaySound", "ReloadUI", "SetCVar", "ShowUIPanel", "StaticPopup_Show",
@@ -35,7 +35,7 @@ read_globals = {
 
     -- Frames, objetos y constantes de Blizzard
     "ActionBarButtonEventsFrame", "ChatFontNormal", "ColorPickerFrame", "CooldownViewerSettings",
-    "EventRegistry", "GameTooltip", "Minimap", "SettingsPanel", "Settings", "UIParent", "UISpecialFrames",
+    "EditModeManagerFrame", "EventRegistry", "GameTooltip", "Minimap", "SettingsPanel", "Settings", "UIParent", "UISpecialFrames",
     "ACCEPT", "CANCEL", "NO", "YES", "RAID_CLASS_COLORS", "RANGE_INDICATOR", "SOUNDKIT", "STANDARD_TEXT_FONT",
 }
 
