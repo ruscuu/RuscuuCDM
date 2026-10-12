@@ -462,6 +462,8 @@ events:SetScript("OnEvent", function(_, event, arg1)
         ns.HookActionBars()
         ns.HookViewers()
         ns.RefreshAll()
+        -- Para entonces los addons de minimapa ya decidieron su forma (cuadrada, redonda...)
+        ns.UpdateMinimapPosition()
     elseif event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED"
         or (event == "PLAYER_SPECIALIZATION_CHANGED" and arg1 == "player") then
         ns.SelectProfileForSpec()
