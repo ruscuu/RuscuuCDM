@@ -411,7 +411,7 @@ update()
 -- Al entrar en combate la barra desbloqueada se bloquea sola
 ns.SetActiveUnlocked(true)
 M.inCombat = true; M.FireEvent("PLAYER_REGEN_DISABLED")
-assert(not ns.activeUnlocked and not bar.bg:IsShown(), "en combate se bloquea")
+assert(not ns.activeUnlocked and not bar.mover:IsShown(), "en combate se bloquea")
 M.inCombat = false; M.Tick(0.2)
 
 -- Un cooldown lanzado con la barra desactivada sale al activarla
@@ -447,15 +447,39 @@ M.Tick(0.2)
 _, rel, _, px, py = bar:GetPoint(1)
 assert(rel == essential and px == 0 and py == 10, "sobre esenciales con desplazamiento")
 ns.SetActiveUnlocked(true)
-assert(bar:IsShown() and bar.bg:IsShown() and bar.label:IsShown(), "desbloqueada: fondo y rótulo para arrastrar")
+assert(bar:IsShown() and bar.mover:IsShown() and bar.bg:IsShown() and bar.label:IsShown(),
+    "desbloqueada: asa con fondo y rótulo para arrastrar")
+assert(bar.mover:IsMouseEnabled() and bar.mover:GetFrameStrata() == "DIALOG",
+    "el asa recibe el clic por encima de los iconos y de las opciones")
 assert(icon("spell1"):IsShown() and icon("spell5"):IsShown(), "desbloqueada: se ven todos los iconos elegidos")
-function bar:GetCenter() return 530, 420 end
-function essential:GetCenter() return 500, 400 end
-bar:Fire("OnDragStop")
-assert(ns.db.activeX == 30 and ns.db.activeY == 20, "arrastrar guarda el desplazamiento: " .. ns.db.activeX .. "," .. ns.db.activeY)
+-- Arrastrar sigue al ratón aunque el juego no deje leer dónde están la barra ni los esenciales
+local secret = { __secret = true }
+function bar:GetCenter() return secret, secret end
+function essential:GetCenter() return secret, secret end
+local cursorX, cursorY = 500, 400
+GetCursorPosition = function() return cursorX, cursorY end
+bar.mover:Fire("OnMouseDown", "LeftButton")
+cursorX, cursorY = 505, 400 -- el juego avisa del arrastre tras mover unos píxeles
+bar.mover:Fire("OnDragStart")
+cursorX, cursorY = 520, 380
+bar.mover:Fire("OnUpdate", 0.01)
+_, rel, _, px, py = bar:GetPoint(1)
+assert(rel == essential and px == 20 and py == -10, "mientras se arrastra, la barra sigue al ratón: " .. px .. "," .. py)
+cursorX, cursorY = 530, 420
+bar.mover:Fire("OnDragStop")
+bar.mover:Fire("OnMouseUp", "LeftButton")
+assert(ns.db.activeX == 30 and ns.db.activeY == 30, "arrastrar guarda el desplazamiento: " .. ns.db.activeX .. "," .. ns.db.activeY)
+cursorX, cursorY = 900, 900
+bar.mover:Fire("OnUpdate", 0.01)
+assert(ns.db.activeX == 30 and ns.db.activeY == 30, "al soltar, mover el ratón ya no mueve la barra")
+-- Si se bloquea en medio del arrastre (por ejemplo, al entrar en combate), el arrastre termina
+bar.mover:Fire("OnDragStart")
 ns.SetActiveUnlocked(false)
+cursorX, cursorY = 100, 100
+bar.mover:Fire("OnUpdate", 0.01)
 M.Tick(0.2)
-assert(not bar.bg:IsShown() and not icon("spell1"):IsShown(), "bloqueada otra vez: solo lo que está en cooldown")
+assert(ns.db.activeX == 30 and ns.db.activeY == 30, "bloqueada en medio del arrastre: la barra se queda")
+assert(not bar.mover:IsShown() and not icon("spell1"):IsShown(), "bloqueada otra vez: solo lo que está en cooldown")
 ns.db.activeX, ns.db.activeY = 0, 0
 M.Tick(0.2)
 

@@ -473,16 +473,21 @@ bar:SetSize(1, 1)
 bar:SetFrameStrata("MEDIUM")
 bar:SetClampedToScreen(true)
 bar:SetMovable(true)
-bar:RegisterForDrag("LeftButton")
 bar:Hide()
--- Fondo y rótulo que solo se ven con la barra desbloqueada, para poder arrastrarla
-bar.bg = bar:CreateTexture(nil, "BACKGROUND")
+-- Asa para arrastrar: solo se ve con la barra desbloqueada. Va por encima de todo (de los iconos, de los
+-- buffs de Blizzard colocados en la línea y de la ventana de opciones) para que el clic siempre llegue.
+bar.mover = CreateFrame("Frame", nil, bar)
+bar.mover:SetPoint("TOPLEFT", bar, "TOPLEFT", -4, 4)
+bar.mover:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 4, -4)
+bar.mover:SetFrameStrata("DIALOG")
+bar.mover:EnableMouse(true)
+bar.mover:RegisterForDrag("LeftButton")
+bar.mover:Hide()
+bar.bg = bar.mover:CreateTexture(nil, "BACKGROUND")
 bar.bg:SetAllPoints()
 bar.bg:SetColorTexture(ns.COLORS.purple[1], ns.COLORS.purple[2], ns.COLORS.purple[3], 0.35)
-bar.bg:Hide()
-bar.label = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-bar.label:SetPoint("BOTTOM", bar, "TOP", 0, 4)
-bar.label:Hide()
+bar.label = bar.mover:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+bar.label:SetPoint("BOTTOM", bar.mover, "TOP", 0, 2)
 
 local icons = {}             -- clave ("spell123", "slot13") -> icono
 local entries = {}           -- lo que se muestra, en orden
@@ -740,8 +745,14 @@ local function PlaceBar(db)
     bar:SetPoint("CENTER", anchor, "CENTER", x, y)
 end
 
--- Al soltar la barra arrastrada se guarda su sitio como desplazamiento desde su ancla
-local function SaveDraggedPosition()
+local function ClampOffset(v)
+    local limits = ns.LIMITS.activeX
+    return math.max(limits[1], math.min(limits[2], math.floor(v + 0.5)))
+end
+
+-- Al cambiar de ancla, la barra se queda donde está: se recalcula su desplazamiento desde la nueva ancla
+-- (si el juego no deja leer dónde están, se deja el desplazamiento como estaba)
+function ns.SaveActivePosition()
     local db = ns.db
     if not db then return end
     local anchor, baseY = BarAnchor(db)
@@ -749,28 +760,57 @@ local function SaveDraggedPosition()
     local ax, ay = anchor:GetCenter()
     bx, by, ax, ay = Plain(bx), Plain(by), Plain(ax), Plain(ay)
     if bx and by and ax and ay then
-        local ratio = anchor:GetEffectiveScale() / bar:GetEffectiveScale()
-        local limits = ns.LIMITS.activeX
-        local function clamp(v) return math.max(limits[1], math.min(limits[2], math.floor(v + 0.5))) end
-        db.activeX = clamp(bx - ax * ratio)
-        db.activeY = clamp(by - ay * ratio - baseY)
+        local ratio = (Plain(anchor:GetEffectiveScale()) or 1) / (Plain(bar:GetEffectiveScale()) or 1)
+        db.activeX = ClampOffset(bx - ax * ratio)
+        db.activeY = ClampOffset(by - ay * ratio - baseY)
     end
     placedKey = nil
     if ns.RefreshOptions then ns.RefreshOptions() end
 end
 
--- Al cambiar de ancla, la barra se queda donde está: se recalcula su desplazamiento desde la nueva ancla
-ns.SaveActivePosition = SaveDraggedPosition
+-- Arrastrar: el desplazamiento guardado sigue al ratón y la barra se recoloca con él.
+-- No se usa StartMoving ni se lee dónde está la barra: con la barra de esenciales como ancla,
+-- el juego puede tener ese sitio en secreto y la barra volvería a su posición al soltarla.
+local drag, pressX, pressY
+local function DragUpdate()
+    local db = ns.db
+    if not (drag and db) then return end
+    if not ns.activeUnlocked then
+        -- Bloqueada en medio del arrastre (por ejemplo, al entrar en combate): se queda donde iba
+        drag = nil
+        bar.mover:SetScript("OnUpdate", nil)
+        return
+    end
+    local x, y = GetCursorPosition()
+    local scale = Plain(bar:GetEffectiveScale()) or 1
+    db.activeX = ClampOffset(drag.offsetX + (x - drag.x) / scale)
+    db.activeY = ClampOffset(drag.offsetY + (y - drag.y) / scale)
+    PlaceBar(db)
+end
 
-bar:SetScript("OnDragStart", function(self)
-    if ns.activeUnlocked then self:StartMoving() end
-end)
-bar:SetScript("OnDragStop", function(self)
-    self:StopMovingOrSizing()
-    pcall(self.SetUserPlaced, self, false) -- el sitio lo guarda el perfil, no el juego
-    SaveDraggedPosition()
+local function StopDrag()
+    if not drag then return end
+    DragUpdate()
+    drag = nil
+    bar.mover:SetScript("OnUpdate", nil)
+    if ns.RefreshOptions then ns.RefreshOptions() end
     ns.RequestActiveUpdate()
+end
+
+bar.mover:SetScript("OnDragStart", function(self)
+    local db = ns.db
+    if not (ns.activeUnlocked and db) then return end
+    local x, y = GetCursorPosition()
+    -- El arrastre empieza tras mover unos píxeles: se cuenta desde donde se pulsó el botón
+    if pressX then x, y = pressX, pressY end
+    pressX, pressY = nil, nil
+    drag = { x = x, y = y, offsetX = db.activeX or 0, offsetY = db.activeY or 0 }
+    self:SetScript("OnUpdate", DragUpdate)
 end)
+bar.mover:SetScript("OnMouseDown", function() pressX, pressY = GetCursorPosition() end)
+bar.mover:SetScript("OnMouseUp", function() pressX, pressY = nil, nil end)
+bar.mover:SetScript("OnDragStop", StopDrag)
+bar.mover:SetScript("OnHide", StopDrag)
 
 -- Buffs que Blizzard muestra como barra: en la línea solo se ve su icono, con el tiempo restante encima
 local function Compact(item, on)
@@ -1023,10 +1063,8 @@ local function Update()
     local essential = _G.EssentialCooldownViewer
     bar:SetAlpha(essential and Plain(essential:GetAlpha()) or 1)
     local unlocked = ns.activeUnlocked == true
-    bar:EnableMouse(unlocked)
-    bar.bg:SetShown(unlocked)
     bar.label:SetText(L["Ruscuu: drag the bar"])
-    bar.label:SetShown(unlocked)
+    bar.mover:SetShown(unlocked)
     bar:Show()
     -- Desbloqueada, la vista previa se repite para que siempre se vean los iconos girando
     if unlocked and now - previewStart > PREVIEW_LENGTH then
