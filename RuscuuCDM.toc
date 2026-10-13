@@ -7,6 +7,13 @@
 ## Notes-frFR: Style Ruscuu pour le Cooldown Manager de Blizzard : thèmes, profils par spécialisation et compte à rebours.
 ## Notes-ptBR: Estilo visual Ruscuu para o Cooldown Manager da Blizzard: temas, perfis por especialização e números de recarga.
 ## Notes-ruRU: Стиль Ruscuu для Cooldown Manager от Blizzard: темы, профили для специализаций и цифры восстановления.
+## Category: Combat
+## Category-esES: Combate
+## Category-esMX: Combate
+## Category-deDE: Kampf
+## Category-frFR: Combat
+## Category-ptBR: Combate
+## Category-ruRU: Бой
 ## Author: Ruscuu
 ## Version: @project-version@
 ## IconTexture: Interface\AddOns\RuscuuCDM\Media\icon

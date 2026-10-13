@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.6.1
+
+**Changed**
+- The addon now appears under the **Combat** category in the game's addon list.
+
 ## v0.6.0
 
 **New** (Active cooldowns bar)
