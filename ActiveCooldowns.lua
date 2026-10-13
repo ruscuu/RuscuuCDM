@@ -174,10 +174,22 @@ function ns.GetSpellbookSpells()
     if not (book and book.GetNumSpellBookSkillLines and Enum and Enum.SpellBookSpellBank) then return list end
     local SPELL = Enum.SpellBookItemType and Enum.SpellBookItemType.Spell
     local PET_ACTION = Enum.SpellBookItemType and Enum.SpellBookItemType.PetAction
+    -- En Forever los hechizos tienen rangos: cada rango es otro hechizo con el mismo nombre. Se deja uno por
+    -- nombre (el último del libro, que es el rango más alto) y se recuerdan todos sus rangos.
+    local byName = {}
     local function add(info, spellID)
         if not info or info.isPassive or info.isOffSpec or type(spellID) ~= "number" or seen[spellID] then return end
         seen[spellID] = true
-        list[#list + 1] = { spellID = spellID, name = info.name or SpellName(spellID), icon = info.iconID }
+        local name = info.name or SpellName(spellID)
+        local entry = byName[name]
+        if entry then
+            entry.spellID, entry.icon = spellID, info.iconID or entry.icon
+            entry.ranks[#entry.ranks + 1] = spellID
+            return
+        end
+        entry = { spellID = spellID, name = name, icon = info.iconID, ranks = { spellID } }
+        byName[name] = entry
+        list[#list + 1] = entry
     end
     local FLYOUT = Enum.SpellBookItemType and Enum.SpellBookItemType.Flyout
     -- Hechizos de un menú desplegable del libro (portales, invocaciones...)
@@ -257,9 +269,11 @@ end
 local function BuildEntries()
     local db = ns.db
     local entries, seen = {}, {}
+    local names = {}
     local function addSpell(id)
-        if seen[id] then return end
-        seen[id] = true
+        local name = SpellName(id)
+        if seen[id] or names[name] then return end -- dos rangos del mismo hechizo: un solo icono
+        seen[id], names[name] = true, true
         entries[#entries + 1] = { key = "spell" .. id, spell = id }
     end
     if db.activeCDM then

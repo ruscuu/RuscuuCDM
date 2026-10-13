@@ -14,6 +14,7 @@ Enum = { SpellBookSpellBank = { Player = 0, Pet = 1 },
     SpellBookItemType = { None = 0, Spell = 1, FutureSpell = 2, PetAction = 3, Flyout = 4 } }
 local playerBook = {
     { itemType = 1, actionID = 200, spellID = 200, name = "Golpe", iconID = 1, isPassive = false, isOffSpec = false },
+    { itemType = 1, actionID = 210, spellID = 210, name = "Golpe", iconID = 1, isPassive = false, isOffSpec = false },
     { itemType = 1, actionID = 201, spellID = 201, name = "Pasivo", iconID = 1, isPassive = true, isOffSpec = false },
     { itemType = 4, actionID = 7, name = "Portales", iconID = 1, isPassive = false, isOffSpec = false },
     { itemType = 1, actionID = 202, spellID = 202, name = "De otra especialización", iconID = 1, isPassive = false, isOffSpec = false },
@@ -23,8 +24,8 @@ local petCooldown = { isActive = false, isOnGCD = false }
 C_SpellBook = {
     GetNumSpellBookSkillLines = function() return 2 end,
     GetSpellBookSkillLineInfo = function(line)
-        if line == 1 then return { name = "Clase", itemIndexOffset = 0, numSpellBookItems = 3, shouldHide = false, isGuild = false } end
-        return { name = "Otra", itemIndexOffset = 3, numSpellBookItems = 1, shouldHide = false, isGuild = false, offSpecID = 5 }
+        if line == 1 then return { name = "Clase", itemIndexOffset = 0, numSpellBookItems = 4, shouldHide = false, isGuild = false } end
+        return { name = "Otra", itemIndexOffset = 4, numSpellBookItems = 1, shouldHide = false, isGuild = false, offSpecID = 5 }
     end,
     GetSpellBookItemInfo = function(slot, bank)
         if bank == 1 then return petBook[slot] end
@@ -46,7 +47,7 @@ GetFlyoutSlotInfo = function(_, i)
     if i == 1 then return 300, 300, true, "Portal: Ventormenta" end
     return 301, 301, false, "Portal sin aprender"
 end
-local known = { [100] = true, [200] = true, [300] = true, [642] = true }
+local known = { [100] = true, [200] = true, [210] = true, [300] = true, [642] = true }
 C_Spell.GetSpellName = function(id) if known[id] or id == 400 then return "S" .. id end end
 C_Spell.GetSpellInfo = function(name) if name == "Escudo divino" then return { spellID = 642 } end end
 C_Spell.GetSpellCooldown = function(id) if known[id] then return { isActive = false, isOnGCD = false } end end
@@ -54,7 +55,8 @@ C_Spell.GetSpellCooldown = function(id) if known[id] then return { isActive = fa
 -- Lista del libro: sin pasivos ni otras especializaciones, con los del menú desplegable aprendidos y la mascota
 local list = {}
 for _, sp in ipairs(ns.GetSpellbookSpells()) do list[#list + 1] = sp.spellID end
-assert(table.concat(list, ",") == "200,300,400", "hechizos del libro: " .. table.concat(list, ","))
+-- Los rangos de un hechizo (Golpe 200 y 210) salen una sola vez, con el rango más alto
+assert(table.concat(list, ",") == "210,300,400", "hechizos del libro: " .. table.concat(list, ","))
 
 -- Abrir la página
 local page
@@ -86,16 +88,23 @@ local function headers()
 end
 
 local r = rows()
-assert(r[100] and r[200] and r[300] and r[400] and not r[201] and not r[202] and not r[301], "filas de la lista")
-assert(r[100]:GetChecked() and not r[200]:GetChecked(), "los del Cooldown Manager vienen marcados, los demás no")
+assert(r[100] and r[210] and r[300] and r[400] and not r[201] and not r[202] and not r[301], "filas de la lista")
+assert(r[100]:GetChecked() and not r[210]:GetChecked(), "los del Cooldown Manager vienen marcados, los demás no")
 assert(headers():find("Cooldown Manager %(1%)") and headers():find("Libro de hechizos %(3%)"),
     "secciones de la lista: " .. headers())
 
+-- Un rango bajo elegido antes (200) marca el hechizo; al desmarcarlo se quitan todos sus rangos
+ns.db.activeAdd[200] = true
+page:Hide(); page:Show(); page:Fire("OnShow")
+r = rows()
+assert(r[210] and not r[200] and r[210]:GetChecked(), "un rango elegido marca el hechizo")
+r[210]:SetChecked(false); r[210]:Fire("OnClick")
+assert(not ns.db.activeAdd[200] and not ns.db.activeAdd[210] and not r[210]:GetChecked(), "se quitan todos los rangos")
 -- Marcar uno del libro y quitar uno del Cooldown Manager
-r[200]:SetChecked(true); r[200]:Fire("OnClick")
+r[210]:SetChecked(true); r[210]:Fire("OnClick")
 r[100]:SetChecked(false); r[100]:Fire("OnClick")
-assert(ns.db.activeAdd[200] and ns.db.activeRemove[100], "se guarda lo elegido")
-assert(r[200]:GetChecked() and not r[100]:GetChecked(), "las casillas siguen lo elegido")
+assert(ns.db.activeAdd[210] and ns.db.activeRemove[100], "se guarda lo elegido")
+assert(r[210]:GetChecked() and not r[100]:GetChecked(), "las casillas siguen lo elegido")
 
 -- Buscador
 local search, add
@@ -107,9 +116,9 @@ end
 assert(search and add, "cuadros de buscar y añadir")
 search:SetText("portal"); search:Fire("OnTextChanged", true)
 r = rows()
-assert(r[300] and not r[200] and not r[100], "el buscador filtra por nombre")
+assert(r[300] and not r[210] and not r[100], "el buscador filtra por nombre")
 search:SetText(""); search:Fire("OnTextChanged", true)
-assert(rows()[200], "sin texto se ve todo")
+assert(rows()[210], "sin texto se ve todo")
 
 -- Añadir por nombre o por número un hechizo que no está en el libro
 local realPrint = print

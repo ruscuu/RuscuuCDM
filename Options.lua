@@ -925,6 +925,14 @@ end
 -- Página Cooldowns activos: la barra y sus hechizos
 ------------------------------------------------------------------------
 
+-- Un hechizo con rangos está elegido si lo está cualquiera de ellos
+local function AnyRankChosen(ranks)
+    for _, id in ipairs(ranks) do
+        if ns.IsActiveSpellChosen(id) then return true end
+    end
+    return false
+end
+
 local function BuildActive(ui, panel)
     local _, h = ui:Note(L["A bar of your own with only the cooldowns that are running, in one line centered where the essential cooldowns are, and the active buffs next to them. Blizzard's essential and utility icons are hidden while it is on; everything goes back to normal while Edit Mode or Blizzard's cooldown settings are open."])
     ui:Next(h)
@@ -959,8 +967,12 @@ local function BuildActive(ui, panel)
             end
         end
         for _, sp in ipairs(ns.GetSpellbookSpells()) do
-            if not seen[sp.spellID] then
-                seen[sp.spellID] = true
+            local known = false
+            for _, id in ipairs(sp.ranks or { sp.spellID }) do
+                if seen[id] then known = true end
+            end
+            if not known then
+                for _, id in ipairs(sp.ranks or { sp.spellID }) do seen[id] = true end
                 book.spells[#book.spells + 1] = sp
             end
         end
@@ -1005,8 +1017,13 @@ local function BuildActive(ui, panel)
                     local row = rows[rowCount]
                     if not row then
                         row = NewSpellRow(ui, function(self, on)
-                            ns.SetActiveSpellChosen(self.spellID, on)
-                            self:SetChecked(ns.IsActiveSpellChosen(self.spellID))
+                            if on then
+                                ns.SetActiveSpellChosen(self.spellID, true)
+                            else
+                                -- Se quitan todos los rangos del hechizo
+                                for _, id in ipairs(self.ranks) do ns.SetActiveSpellChosen(id, false) end
+                            end
+                            self:SetChecked(AnyRankChosen(self.ranks))
                             ns.RefreshActiveBar()
                         end)
                         rows[rowCount] = row
@@ -1014,7 +1031,8 @@ local function BuildActive(ui, panel)
                     local col = (i % 2 == 1) and 1 or 2
                     row:ClearAllPoints()
                     row:SetPoint("TOPLEFT", ui:X(col) - 4, y - math.floor((i - 1) / 2) * 28)
-                    ShowSpellRow(row, sp, ns.IsActiveSpellChosen(sp.spellID))
+                    row.ranks = sp.ranks or { sp.spellID }
+                    ShowSpellRow(row, sp, AnyRankChosen(row.ranks))
                 end
                 y = y - math.ceil(#list / 2) * 28 - 8
             end
