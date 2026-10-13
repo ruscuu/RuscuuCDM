@@ -585,8 +585,19 @@ local function Editing()
     return CooldownViewerSettings ~= nil and CooldownViewerSettings:IsShown() == true
 end
 
--- La barra se ve cuando se vería la de esenciales (su visibilidad se elige en el modo de edición)
-local function AnchorShown()
+local function InCombat()
+    local inCombat = UnitAffectingCombat and UnitAffectingCombat("player")
+    if type(inCombat) == "boolean" and not ns.IsSecret(inCombat) then return inCombat end
+    return InCombatLockdown() == true
+end
+
+-- ¿Se ve la barra? Siempre, solo en combate, nunca, o como la de esenciales (su visibilidad se elige en el
+-- modo de edición de Blizzard)
+local function BarShown(db)
+    local mode = db.activeShow
+    if mode == "always" then return true end
+    if mode == "combat" then return InCombat() end
+    if mode == "hidden" then return false end
     local anchor = _G.EssentialCooldownViewer
     return not anchor or Shown(anchor)
 end
@@ -769,8 +780,8 @@ local function Update()
     end
 
     local buffViewer = _G[BUFF_VIEWER]
-    if not AnchorShown() then
-        -- La barra de esenciales está oculta (por ejemplo, "solo en combate"): los buffs vuelven a su sitio
+    if not BarShown(db) then
+        -- La barra no se ve ahora (por ejemplo, fuera de combate): los buffs vuelven a su sitio
         for _, item in ipairs(ViewerItems(buffViewer)) do RestoreBuff(item) end
         bar:Hide()
         lastLine = nil
@@ -911,7 +922,8 @@ end
 
 local events = CreateFrame("Frame")
 local COOLDOWN_EVENTS = { SPELL_UPDATE_COOLDOWN = true, SPELL_UPDATE_CHARGES = true, SPELL_UPDATE_ICON = true,
-    ACTIONBAR_UPDATE_COOLDOWN = true, BAG_UPDATE_COOLDOWN = true, PLAYER_ENTERING_WORLD = true }
+    ACTIONBAR_UPDATE_COOLDOWN = true, BAG_UPDATE_COOLDOWN = true, PLAYER_ENTERING_WORLD = true,
+    PLAYER_REGEN_DISABLED = true, PLAYER_REGEN_ENABLED = true }
 local LIST_EVENTS = { SPELLS_CHANGED = true, PLAYER_EQUIPMENT_CHANGED = true, PLAYER_SPECIALIZATION_CHANGED = true,
     PLAYER_TALENT_UPDATE = true, TRAIT_CONFIG_UPDATED = true, UNIT_PET = true, PET_BAR_UPDATE = true }
 for event in pairs(COOLDOWN_EVENTS) do pcall(events.RegisterEvent, events, event) end

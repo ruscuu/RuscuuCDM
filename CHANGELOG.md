@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.5.1
+
+**New**
+- **Show the active cooldowns bar**: always, only in combat, hidden, or like the essential cooldowns (as before, the default).
+- **- and + buttons** next to every slider value, to adjust one step at a time.
+
+**Changed**
+- The mouse wheel no longer changes slider values, so scrolling the options page never changes a setting by accident.
+
 ## v0.5.0
 
 **New**
@@ -13,7 +22,7 @@
 - **Border when a buff is about to end**, on the Cooldown Manager's buff icons and bars, with its own color and seconds (off by default). Like the golden border, the game decides when it shows: the addon never reads the remaining time.
 - **Bartender4, Dominos and ElvUI**: their action buttons get the styled numbers, the golden border and keybinds too (new "Bars from other addons" checkbox).
 - **Class color bars** option for the buff bars (the Class color theme turns it on).
-- **Type exact values** in the sliders, or use the mouse wheel over the value.
+- **Type exact values** in the sliders.
 - **Square minimaps** (Leatrix Plus, SexyMap…): the minimap button follows the square edge.
 - **New languages**: German, French, Portuguese and Russian.
 - **Reload UI** button on every options page.
