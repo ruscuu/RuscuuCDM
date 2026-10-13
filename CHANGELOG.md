@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.2
+
+**Fixed**
+- Characters of different classes no longer mix their spells and icons. Each class now gets its **own profile** the first time you log in with it (a copy of Default's look, without spells from other classes), used by every specialization until you pick another one.
+- Even when a profile is shared on purpose, a spell your character doesn't know never shows up in the active cooldowns bar.
+
 ## v0.6.1
 
 **Changed**

@@ -11,9 +11,66 @@ ns.activeProfile = "Default"
 local function CharData()
     local key = UnitName("player") .. "-" .. GetRealmName()
     local chars = ns.global.chars
-    chars[key] = chars[key] or { specs = {} }
-    chars[key].specs = chars[key].specs or {}
-    return chars[key]
+    chars[key] = chars[key] or { specs = {}, classProfiles = true }
+    local char = chars[key]
+    char.specs = char.specs or {}
+    -- Antes todos los personajes usaban Default y se mezclaban los hechizos de varias clases. Lo que apuntaba a
+    -- Default pasa a usar el perfil de su clase (una sola vez: después Default se puede volver a elegir).
+    if not char.classProfiles then
+        for spec, profile in pairs(char.specs) do
+            if profile == "Default" then char.specs[spec] = nil end
+        end
+        if char.noSpec == "Default" then char.noSpec = nil end
+        char.classProfiles = true
+    end
+    return char
+end
+
+-- Lo que solo tiene sentido para una clase: hechizos elegidos, su orden, sus sonidos y sus excepciones
+local SPELL_KEYS = { "activeAdd", "activeRemove", "expireExclude" }
+
+-- Copia de un perfil para otra clase: el aspecto se conserva, los hechizos que la clase no conoce no
+local function CopyForClass(source)
+    local copy = ns.CopyTable(source)
+    local knows = ns.PlayerKnowsSpell or function() return nil end
+    for _, key in ipairs(SPELL_KEYS) do
+        if type(copy[key]) == "table" then
+            for id in pairs(copy[key]) do
+                if type(id) ~= "number" or knows(id) == false then copy[key][id] = nil end
+            end
+        end
+    end
+    local function keepKey(key)
+        local id = type(key) == "string" and tonumber(key:match("^spell(%d+)$"))
+        return not id or knows(id) ~= false
+    end
+    if type(copy.activeSound) == "table" then
+        for key in pairs(copy.activeSound) do
+            if not keepKey(key) then copy.activeSound[key] = nil end
+        end
+    end
+    if type(copy.activeOrder) == "table" then
+        local order = {}
+        for _, key in ipairs(copy.activeOrder) do
+            if keepKey(key) then order[#order + 1] = key end
+        end
+        copy.activeOrder = order
+    end
+    return copy
+end
+
+-- Perfil propio de la clase del personaje (se crea la primera vez como copia de Default, sin hechizos ajenos).
+-- Es el que usa cada especialización mientras el jugador no elija otro.
+local function ClassProfile()
+    local className, class = UnitClass("player")
+    if type(class) ~= "string" then return "Default" end
+    local profiles, map = ns.global.profiles, ns.global.classProfiles
+    local name = map[class]
+    if name and profiles[name] then return name end
+    name = type(className) == "string" and className ~= "" and className or class
+    if not profiles[name] then profiles[name] = CopyForClass(profiles.Default or {}) end
+    map[class] = name
+    return name
 end
 
 -- Cambia el perfil activo sin reaplicar el estilo (se usa al cargar)
@@ -46,7 +103,7 @@ function ns.ProfileForSpec(specIndex)
     local name
     if specIndex then name = char.specs[specIndex] else name = char.noSpec end
     if name and ns.global.profiles[name] then return name end
-    return "Default"
+    return ClassProfile()
 end
 
 function ns.SelectProfileForSpec()
@@ -106,6 +163,9 @@ function ns.RenameProfile(old, new)
         return
     end
     profiles[new], profiles[old] = profiles[old], nil
+    for class, profile in pairs(ns.global.classProfiles) do
+        if profile == old then ns.global.classProfiles[class] = new end
+    end
     for _, char in pairs(ns.global.chars) do
         for spec, profile in pairs(char.specs or {}) do
             if profile == old then char.specs[spec] = new end
@@ -122,6 +182,9 @@ function ns.DeleteProfile(name)
         return
     end
     ns.global.profiles[name] = nil
+    for class, profile in pairs(ns.global.classProfiles) do
+        if profile == name then ns.global.classProfiles[class] = nil end
+    end
     -- Las especializaciones que usaban ese perfil vuelven a Default
     for _, char in pairs(ns.global.chars) do
         for spec, profile in pairs(char.specs or {}) do
