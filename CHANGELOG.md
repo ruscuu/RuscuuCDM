@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.6.0
+
+**New** (Active cooldowns bar)
+- **Test for 10 seconds**: fills the bar with your chosen spells so you can see its size, spacing and position.
+- **Move the bar freely**: on the essential cooldowns (as before) or free on the screen, with horizontal and vertical position. **Unlock to drag** it with the mouse.
+- **Order**: new "Active cooldowns: order and sound" page to move each icon left or right.
+- **Sound when ready**: mark the spells that should play a sound when their cooldown ends, and choose the sound.
+- **Items**: add potions, healthstones or any item by ID or name; the icon shows how many you have.
+- **Buff bars too**: buffs that the Cooldown Manager shows as bars go into the line as an icon, with their time left on it.
+- **Hide when mounted** (or in a vehicle) and **hide while resting**.
+
+**Other**
+- The addon is now also published on Wago Addons.
+
 ## v0.5.2
 
 **Fixed**

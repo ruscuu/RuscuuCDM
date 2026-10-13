@@ -9,7 +9,7 @@ It only changes how things look — it never reads combat data, so it follows Fo
 ## Features
 
 - Ruscuu style for the four Cooldown Manager viewers (essential, utility, buff icons, buff bars): square icons, icon crop, borders (custom or class color), swipe color, swipe edge, finish flash, bar texture and colors (custom or class color).
-- **Active cooldowns bar**: only the cooldowns that are running, in one centered line together with the active buffs, with a flash when each one ends. Choose any spell (spellbook, pet, by ID or name) and your trinkets, and the icon size and spacing.
+- **Active cooldowns bar**: only the cooldowns that are running, in one centered line together with the active buffs (icons and bars), with a flash and an optional sound when each one ends. Choose any spell (spellbook, pet, by ID or name), your trinkets and any item, their order, the icon size and spacing, and where the bar goes (drag it or set its position). Test it for 10 seconds from the options.
 - **Keybinds on Cooldown Manager icons**: the key that casts each spell, taken from your action bars.
 - **Golden border** during the last seconds of a cooldown, on action buttons and Cooldown Manager icons: seconds, color, thickness, glow and blink style/speed — and you choose which spells get it.
 - **Border when a buff is about to end**, on the Cooldown Manager's buff icons and bars.
@@ -46,7 +46,7 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 ### Funciones
 
 - Estilo Ruscuu para los cuatro visores del Cooldown Manager (esenciales, utilidad, buffs en iconos y en barras): iconos cuadrados, recorte, bordes (color propio o de clase), color del barrido, línea del barrido, destello al terminar, textura y colores de las barras (color propio o de clase).
-- **Barra de cooldowns activos**: solo los cooldowns que están en marcha, en una línea centrada junto a los buffs activos, con un destello cuando termina cada uno. Elige cualquier hechizo (del libro, de la mascota, por número o nombre) y tus abalorios, y el tamaño y la separación de los iconos.
+- **Barra de cooldowns activos**: solo los cooldowns que están en marcha, en una línea centrada junto a los buffs activos (iconos y barras), con un destello y un sonido opcional cuando termina cada uno. Elige cualquier hechizo (del libro, de la mascota, por número o nombre), tus abalorios y cualquier objeto, su orden, el tamaño y la separación de los iconos, y dónde va la barra (arrástrala o pon su posición). Pruébala 10 segundos desde las opciones.
 - **Atajos de teclado en los iconos del Cooldown Manager**: la tecla que lanza cada hechizo, según tus barras de acción.
 - **Borde dorado** en los últimos segundos de un cooldown, en los botones de acción y en los iconos del Cooldown Manager: segundos, color, grosor, resplandor y tipo/velocidad de parpadeo; y eliges a qué hechizos se aplica.
 - **Borde cuando un buff va a terminar**, en los iconos y barras de buffs del Cooldown Manager.
@@ -76,4 +76,4 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 
 Every push and pull request runs the **Check** workflow: Lua syntax, `luacheck`, `tools/check_locales.py` (every text translated in every language) and the tests in `tests/`, which load the addon with a small simulator of the WoW API (`tests/wowmock.lua`). Run them locally with `luacheck .`, `python3 tools/check_locales.py` and `sh tests/run.sh` (needs LuaJIT). They don't replace testing in the game.
 
-Pushing a tag like `v0.5.0`, or running **Actions → Release → Run workflow** with the version (the workflow then creates the tag on the chosen branch), runs the GitHub Action that packages the addon and uploads it to CurseForge and GitHub Releases (and Wago if configured). Required repository secret: `CF_API_KEY` (and `WAGO_API_TOKEN` plus `## X-Wago-ID` in `RuscuuCDM.toc` for Wago).
+Pushing a tag like `v0.5.0`, or running **Actions → Release → Run workflow** with the version (the workflow then creates the tag on the chosen branch), runs the GitHub Action that packages the addon and uploads it to CurseForge, Wago Addons and GitHub Releases. Required repository secrets: `CF_API_KEY` and `WAGO_API_TOKEN` (the project IDs are in `RuscuuCDM.toc`).

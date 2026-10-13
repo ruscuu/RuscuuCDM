@@ -20,7 +20,27 @@ local MIN_FLASH = 1.6        -- sin destello si el icono se vio menos que un tie
 local EVAL_INTERVAL = 0.1    -- cada cuánto se revisa qué cooldowns están activos
 local COOLDOWN_VIEWERS = { "EssentialCooldownViewer", "UtilityCooldownViewer" }
 local BUFF_VIEWER = "BuffIconCooldownViewer"
+local BUFF_BAR_VIEWER = "BuffBarCooldownViewer"
+local PREVIEW_LENGTH = 10    -- segundos de la vista previa de la barra
 ns.TRINKET_SLOTS = { 13, 14 }
+
+-- Sonidos para avisar de que un cooldown está listo (kit de Blizzard, con su número por si falta el nombre)
+ns.ACTIVE_SOUNDS = {
+    { key = "ready", kit = "READY_CHECK", id = 8960, nameKey = "Ready check" },
+    { key = "warning", kit = "RAID_WARNING", id = 8959, nameKey = "Raid warning" },
+    { key = "alarm", kit = "ALARM_CLOCK_WARNING_3", id = 12889, nameKey = "Alarm clock" },
+    { key = "ping", kit = "MAP_PING", id = 3175, nameKey = "Map ping" },
+}
+
+function ns.PlayActiveSound(key)
+    for _, sound in ipairs(ns.ACTIVE_SOUNDS) do
+        if sound.key == key then
+            local kit = SOUNDKIT and SOUNDKIT[sound.kit] or sound.id
+            pcall(PlaySound, kit, "Master")
+            return
+        end
+    end
+end
 
 ------------------------------------------------------------------------
 -- Iconos de Blizzard: se ocultan (esenciales y utilidad) o se colocan en la línea (buffs)
@@ -266,7 +286,43 @@ function ns.FindSpell(text)
     if ok and type(name) == "string" then return id end
 end
 
--- Lo que muestra la barra, en orden: hechizos del Cooldown Manager, los añadidos (por nombre) y los abalorios
+-- Funciones de objetos del juego (pueden no existir en algún cliente: entonces se ignora)
+local function ItemAPI(name)
+    return C_Item and C_Item[name]
+end
+
+function ns.ActiveItemIcon(itemID)
+    local get = ItemAPI("GetItemIconByID")
+    if not get then return end
+    local ok, icon = pcall(get, itemID)
+    if ok and not ns.IsSecret(icon) then return icon end
+end
+
+local function ItemName(itemID)
+    local ok, name = pcall(ItemAPI("GetItemNameByID"), itemID)
+    if ok and type(name) == "string" then return name end
+    -- Aún no está en la caché del juego: se pide, y GET_ITEM_INFO_RECEIVED avisa cuando llega
+    pcall(ItemAPI("RequestLoadItemDataByID"), itemID)
+    return "#" .. itemID
+end
+ns.ActiveItemName = ItemName
+
+-- Busca un objeto por su número, su enlace o su nombre (de algo que el juego conozca, como lo de las bolsas)
+function ns.FindItem(text)
+    text = strtrim(text or "")
+    if text == "" then return end
+    local id = tonumber(text) or tonumber(text:match("item:(%d+)"))
+    if not id then
+        local ok, found = pcall(ItemAPI("GetItemInfoInstant"), text)
+        id = ok and found or nil
+    end
+    if type(id) ~= "number" or id <= 0 or id ~= math.floor(id) then return end
+    local ok, found = pcall(ItemAPI("GetItemInfoInstant"), id)
+    if ok and found then return id end
+end
+
+-- Lo que muestra la barra: hechizos del Cooldown Manager, los añadidos (por nombre), los abalorios y los objetos,
+-- en el orden que eligió el jugador (lo que no tiene sitio en ese orden va al final)
 local function BuildEntries()
     local db = ns.db
     local entries, seen = {}, {}
@@ -294,6 +350,24 @@ local function BuildEntries()
     for i, slot in ipairs(ns.TRINKET_SLOTS) do
         if db["activeTrinket" .. i] then entries[#entries + 1] = { key = "slot" .. slot, slot = slot } end
     end
+    local items = {}
+    for id, on in pairs(db.activeItems) do
+        if on and type(id) == "number" then items[#items + 1] = { id = id, name = ItemName(id) } end
+    end
+    table.sort(items, function(a, b)
+        if a.name ~= b.name then return a.name < b.name end
+        return a.id < b.id
+    end)
+    for _, it in ipairs(items) do entries[#entries + 1] = { key = "item" .. it.id, item = it.id } end
+
+    local rank = {}
+    for i, key in ipairs(db.activeOrder) do
+        if type(key) == "string" and not rank[key] then rank[key] = i end
+    end
+    for i, e in ipairs(entries) do e.index = i end
+    table.sort(entries, function(a, b)
+        return (rank[a.key] or 10000 + a.index) < (rank[b.key] or 10000 + b.index)
+    end)
     return entries
 end
 
@@ -371,14 +445,23 @@ local function SpellState(id)
     return empty or recharging, empty, recharging, isCharge
 end
 
--- Abalorios: el juego no oculta su cooldown, pero por si acaso se comprueba
-local function SlotState(slot)
-    if not GetInventoryItemCooldown then return false end
-    local ok, start, duration, enable = pcall(GetInventoryItemCooldown, "player", slot)
+-- Abalorios y objetos: el juego no oculta su cooldown, pero por si acaso se comprueba
+local function TimesState(ok, start, duration, enable)
     if not ok or ns.IsSecret(start) or ns.IsSecret(duration) or ns.IsSecret(enable) then return nil end
     if type(start) ~= "number" or type(duration) ~= "number" then return false end
     local active = (enable == 1 or enable == true) and start > 0 and duration > 1.5 and start + duration > GetTime()
     return active, start, duration
+end
+
+local function SlotState(slot)
+    if not GetInventoryItemCooldown then return false end
+    return TimesState(pcall(GetInventoryItemCooldown, "player", slot))
+end
+
+local function ItemState(itemID)
+    local get = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
+    if not get then return false end
+    return TimesState(pcall(get, itemID))
 end
 
 ------------------------------------------------------------------------
@@ -388,7 +471,23 @@ end
 local bar = CreateFrame("Frame", "RuscuuCDMActiveBar", UIParent)
 bar:SetSize(1, 1)
 bar:SetFrameStrata("MEDIUM")
+bar:SetClampedToScreen(true)
+bar:SetMovable(true)
 bar:Hide()
+-- Asa para arrastrar: solo se ve con la barra desbloqueada. Va por encima de todo (de los iconos, de los
+-- buffs de Blizzard colocados en la línea y de la ventana de opciones) para que el clic siempre llegue.
+bar.mover = CreateFrame("Frame", nil, bar)
+bar.mover:SetPoint("TOPLEFT", bar, "TOPLEFT", -4, 4)
+bar.mover:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 4, -4)
+bar.mover:SetFrameStrata("DIALOG")
+bar.mover:EnableMouse(true)
+bar.mover:RegisterForDrag("LeftButton")
+bar.mover:Hide()
+bar.bg = bar.mover:CreateTexture(nil, "BACKGROUND")
+bar.bg:SetAllPoints()
+bar.bg:SetColorTexture(ns.COLORS.purple[1], ns.COLORS.purple[2], ns.COLORS.purple[3], 0.35)
+bar.label = bar.mover:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+bar.label:SetPoint("BOTTOM", bar.mover, "TOP", 0, 2)
 
 local icons = {}             -- clave ("spell123", "slot13") -> icono
 local entries = {}           -- lo que se muestra, en orden
@@ -400,6 +499,8 @@ local function ShowTooltip(f)
     GameTooltip:SetOwner(f, "ANCHOR_RIGHT")
     if f.entry.slot then
         GameTooltip:SetInventoryItem("player", f.entry.slot)
+    elseif f.entry.item then
+        GameTooltip:SetItemByID(f.entry.item)
     else
         GameTooltip:SetSpellByID(f.spellID or f.entry.spell)
     end
@@ -485,6 +586,8 @@ local function UpdateTexture(f)
     if entry.slot then
         local ok, tex = pcall(GetInventoryItemTexture, "player", entry.slot)
         texture = ok and tex or nil
+    elseif entry.item then
+        texture = ns.ActiveItemIcon(entry.item)
     else
         -- Con el hechizo base: el juego ya da el icono del que lo sustituye, y vuelve al original al terminar
         local ok, tex, _, conditional = pcall(C_Spell.GetSpellTexture, entry.spell)
@@ -570,7 +673,16 @@ local function ApplySlotCooldown(f, db, active, start, duration)
     f.cd:SetDrawSwipe(db.showSwipe)
     if db.cooldownEdge ~= "blizzard" then f.cd:SetDrawEdge(db.cooldownEdge == "show") end
     f.icon:SetDesaturated(active == true)
-    f.count:Hide()
+    -- Objetos: cuántos quedan en las bolsas (pociones, piedras de salud...)
+    local count = f.entry and f.entry.item and ItemAPI("GetItemCount")
+    local ok, n = false, nil
+    if count then ok, n = pcall(count, f.entry.item) end
+    if ok and type(n) == "number" and not ns.IsSecret(n) then
+        f.count:SetText(n)
+        f.count:Show()
+    else
+        f.count:Hide()
+    end
 end
 
 ------------------------------------------------------------------------
@@ -594,9 +706,17 @@ local function InCombat()
     return InCombatLockdown() == true
 end
 
+local function Flag(value)
+    return PlainBool(value) and value
+end
+
 -- ¿Se ve la barra? Siempre, solo en combate, nunca, o como la de esenciales (su visibilidad se elige en el
--- modo de edición de Blizzard)
+-- modo de edición de Blizzard); y si se pide, no en montura o vehículo ni descansando
 local function BarShown(db)
+    if db.activeHideMounted and (Flag(IsMounted and IsMounted()) or Flag(UnitInVehicle and UnitInVehicle("player"))) then
+        return false
+    end
+    if db.activeHideResting and Flag(IsResting and IsResting()) then return false end
     local mode = db.activeShow
     if mode == "always" then return true end
     if mode == "combat" then return InCombat() end
@@ -605,11 +725,143 @@ local function BarShown(db)
     return not anchor or Shown(anchor)
 end
 
+
+-- Dónde va la barra: sobre la de esenciales (se mueve con ella en el modo de edición) o libre en la pantalla,
+-- más el desplazamiento elegido. Sin barra de esenciales, un poco por debajo del centro de la pantalla.
+local function BarAnchor(db)
+    local essential = _G.EssentialCooldownViewer
+    if db.activeAnchor ~= "screen" and essential then return essential, 0 end
+    return UIParent, db.activeAnchor ~= "screen" and -150 or 0
+end
+
+local placedKey
+local function PlaceBar(db)
+    local anchor, baseY = BarAnchor(db)
+    local x, y = db.activeX or 0, (db.activeY or 0) + baseY
+    local key = tostring(anchor) .. ":" .. x .. ":" .. y
+    if key == placedKey and bar:GetNumPoints() > 0 then return end
+    placedKey = key
+    bar:ClearAllPoints()
+    bar:SetPoint("CENTER", anchor, "CENTER", x, y)
+end
+
+local function ClampOffset(v)
+    local limits = ns.LIMITS.activeX
+    return math.max(limits[1], math.min(limits[2], math.floor(v + 0.5)))
+end
+
+-- Al cambiar de ancla, la barra se queda donde está: se recalcula su desplazamiento desde la nueva ancla
+-- (si el juego no deja leer dónde están, se deja el desplazamiento como estaba)
+function ns.SaveActivePosition()
+    local db = ns.db
+    if not db then return end
+    local anchor, baseY = BarAnchor(db)
+    local bx, by = bar:GetCenter()
+    local ax, ay = anchor:GetCenter()
+    bx, by, ax, ay = Plain(bx), Plain(by), Plain(ax), Plain(ay)
+    if bx and by and ax and ay then
+        local ratio = (Plain(anchor:GetEffectiveScale()) or 1) / (Plain(bar:GetEffectiveScale()) or 1)
+        db.activeX = ClampOffset(bx - ax * ratio)
+        db.activeY = ClampOffset(by - ay * ratio - baseY)
+    end
+    placedKey = nil
+    if ns.RefreshOptions then ns.RefreshOptions() end
+end
+
+-- Arrastrar: el desplazamiento guardado sigue al ratón y la barra se recoloca con él.
+-- No se usa StartMoving ni se lee dónde está la barra: con la barra de esenciales como ancla,
+-- el juego puede tener ese sitio en secreto y la barra volvería a su posición al soltarla.
+local drag, pressX, pressY
+local function DragUpdate()
+    local db = ns.db
+    if not (drag and db) then return end
+    if not ns.activeUnlocked then
+        -- Bloqueada en medio del arrastre (por ejemplo, al entrar en combate): se queda donde iba
+        drag = nil
+        bar.mover:SetScript("OnUpdate", nil)
+        return
+    end
+    local x, y = GetCursorPosition()
+    local scale = Plain(bar:GetEffectiveScale()) or 1
+    db.activeX = ClampOffset(drag.offsetX + (x - drag.x) / scale)
+    db.activeY = ClampOffset(drag.offsetY + (y - drag.y) / scale)
+    PlaceBar(db)
+end
+
+local function StopDrag()
+    if not drag then return end
+    DragUpdate()
+    drag = nil
+    bar.mover:SetScript("OnUpdate", nil)
+    if ns.RefreshOptions then ns.RefreshOptions() end
+    ns.RequestActiveUpdate()
+end
+
+bar.mover:SetScript("OnDragStart", function(self)
+    local db = ns.db
+    if not (ns.activeUnlocked and db) then return end
+    local x, y = GetCursorPosition()
+    -- El arrastre empieza tras mover unos píxeles: se cuenta desde donde se pulsó el botón
+    if pressX then x, y = pressX, pressY end
+    pressX, pressY = nil, nil
+    drag = { x = x, y = y, offsetX = db.activeX or 0, offsetY = db.activeY or 0 }
+    self:SetScript("OnUpdate", DragUpdate)
+end)
+bar.mover:SetScript("OnMouseDown", function() pressX, pressY = GetCursorPosition() end)
+bar.mover:SetScript("OnMouseUp", function() pressX, pressY = nil, nil end)
+bar.mover:SetScript("OnDragStop", StopDrag)
+bar.mover:SetScript("OnHide", StopDrag)
+
+-- Buffs que Blizzard muestra como barra: en la línea solo se ve su icono, con el tiempo restante encima
+local function Compact(item, on)
+    local s = State(item)
+    local barFrame = item.Bar
+    local duration = barFrame and barFrame.Duration
+    if on then
+        if not s.compact then
+            s.compact = true
+            s.barMouse = item:IsMouseMotionEnabled() == true
+            if barFrame then barFrame:SetAlpha(0) end
+            if duration and item.Icon then
+                s.durMoved = true
+                duration:SetParent(item.Icon)
+                duration:ClearAllPoints()
+                duration:SetPoint("CENTER", item.Icon, "CENTER", 0, 0)
+            end
+        end
+        -- La barra invisible sigue ocupando su sitio: sin ayuda al pasar el ratón por encima
+        if item:IsMouseMotionEnabled() == true then item:SetMouseMotionEnabled(false) end
+    elseif s.compact then
+        s.compact = nil
+        if barFrame then barFrame:SetAlpha(1) end
+        if duration and s.durMoved then
+            -- Su sitio de la plantilla de Blizzard (CooldownViewer.xml). No se leen sus anclas: con el tiempo
+            -- secreto en combate también lo serían, y devolverlas daría error.
+            s.durMoved = nil
+            duration:SetParent(barFrame)
+            duration:ClearAllPoints()
+            duration:SetPoint("RIGHT", barFrame, "RIGHT", -8, 0)
+        end
+        item:SetMouseMotionEnabled(s.barMouse == true)
+    end
+end
+
+-- Devuelve los buffs de Blizzard a su sitio (si se movieron)
+local function RestoreBuff(item)
+    local s = blizz[item]
+    if not s then return end
+    SetHidden(item, false)
+    RestorePoints(item)
+    RestoreScale(item)
+    Compact(item, false)
+end
+
 local function RestoreAll()
     for item, s in pairs(blizz) do
         SetHidden(item, false)
         RestorePoints(item)
         RestoreScale(item)
+        Compact(item, false)
         s.fitted = nil
     end
     for _, f in pairs(icons) do
@@ -623,33 +875,18 @@ local function RestoreAll()
     applied, lastLine, cooldownsDirty, layoutDirty = false, nil, true, true
 end
 
--- En el centro de la barra de esenciales (se mueve con ella en el modo de edición)
-local placedOn
-local function PlaceBar()
-    local anchor = _G.EssentialCooldownViewer
-    if anchor == placedOn and bar:GetNumPoints() > 0 then return end
-    placedOn = anchor
-    bar:ClearAllPoints()
-    if anchor then
-        bar:SetPoint("CENTER", anchor, "CENTER", 0, 0)
-    else
-        bar:SetPoint("CENTER", UIParent, "CENTER", 0, -150)
-    end
+-- ¿Muestra la barra de buffs solo el nombre (sin icono)? Entonces sus buffs no pueden ir en la línea
+local function NameOnly(viewer)
+    local content = Enum and Enum.CooldownViewerBarContent
+    local value = Plain(viewer.barContent)
+    return content ~= nil and value ~= nil and value == content.NameOnly
 end
 
--- Devuelve los buffs de Blizzard a su sitio (si se movieron)
-local function RestoreBuff(item)
-    local s = blizz[item]
-    if not s then return end
-    SetHidden(item, false)
-    RestorePoints(item)
-    RestoreScale(item)
-end
-
--- Un icono de buff de Blizzard al mismo tamaño que los de la barra
-local function FitBuff(item, size)
+-- Un icono de buff de Blizzard al mismo tamaño que los de la barra (en las barras se mide su icono)
+local function FitBuff(item, size, measure)
     local s = State(item)
-    local width, scale, effective = Plain(item:GetWidth()), Plain(item:GetScale()), Plain(item:GetEffectiveScale())
+    local width = Plain((measure or item):GetWidth())
+    local scale, effective = Plain(item:GetScale()), Plain(item:GetEffectiveScale())
     if not (width and scale and effective) or width <= 0 or scale <= 0 then return end
     if not s.fitted then SaveScale(item) end
     local target = size * bar:GetEffectiveScale() / (width * effective / scale)
@@ -666,14 +903,17 @@ local function Arrange(line, db)
     for i, f in ipairs(line) do
         local width = size
         if f.isBlizzard then
-            FitBuff(f.frame, size)
-            local w, e = Plain(f.frame:GetWidth()), Plain(f.frame:GetEffectiveScale())
+            local measure = f.isBar and f.frame.Icon or f.frame
+            FitBuff(f.frame, size, measure)
+            local w, e = Plain(measure:GetWidth()), Plain(f.frame:GetEffectiveScale())
             if w and e then width = w * e / barScale end
         end
         widths[i] = width
         total = total + width + (i > 1 and gap or 0)
     end
-    bar:SetSize(math.max(total, 1), size)
+    -- Desbloqueada y sin nada que mostrar, la barra tiene al menos el ancho de tres iconos para poder cogerla
+    local minimum = ns.activeUnlocked and (3 * size + 2 * gap) or 1
+    bar:SetSize(math.max(total, minimum), size)
     local x = -total / 2
     for i, f in ipairs(line) do
         local width = widths[i]
@@ -684,7 +924,12 @@ local function Arrange(line, db)
             if not s.moved then SavePoints(item) end
             local e = Plain(item:GetEffectiveScale()) or 1
             item:ClearAllPoints()
-            item:SetPoint("CENTER", bar, "CENTER", center * barScale / e, 0)
+            if f.isBar then
+                -- El icono está a la izquierda de la barra de Blizzard: se coloca por ese borde
+                item:SetPoint("LEFT", bar, "CENTER", x * barScale / e, 0)
+            else
+                item:SetPoint("CENTER", bar, "CENTER", center * barScale / e, 0)
+            end
             s.moved = true
         else
             f:SetSize(size, size)
@@ -705,10 +950,10 @@ end
 
 -- Envoltorios de los buffs de Blizzard en la línea (uno fijo por icono, para comparar líneas)
 local buffSlots = setmetatable({}, { __mode = "k" })
-local function BuffSlot(item)
+local function BuffSlot(item, isBar)
     local slot = buffSlots[item]
     if not slot then
-        slot = { isBlizzard = true, frame = item }
+        slot = { isBlizzard = true, isBar = isBar, frame = item }
         buffSlots[item] = slot
     end
     return slot
@@ -773,89 +1018,133 @@ local function RebuildEntries()
     pcall(CaptureGCD, true)
 end
 
+-- Vista previa: todos los iconos elegidos como si estuvieran en cooldown (botón "Probar" o barra desbloqueada)
+local previewUntil, previewStart, wasPreview = 0, 0, false
+
+local function Previewing(now)
+    return ns.activeUnlocked == true or now < previewUntil
+end
+
 local function Update()
     local db = ns.db
-    if not db or not db.activeOnly or Editing() then
+    local now = GetTime()
+    local preview = db ~= nil and Previewing(now)
+    if not db or not (db.activeOnly or preview) or Editing() then
         if applied then RestoreAll() end
+        wasPreview = false
         return
     end
     applied = true
     if entriesDirty then RebuildEntries() end
+    if wasPreview and not preview then cooldownsDirty = true end -- se vuelve a pedir el estado real al juego
+    wasPreview = preview
 
     -- Esenciales y utilidad de Blizzard: ocultos, la barra los sustituye
     for _, name in ipairs(COOLDOWN_VIEWERS) do
         for _, item in ipairs(ViewerItems(_G[name])) do SetHidden(item, true) end
     end
 
-    local buffViewer = _G[BUFF_VIEWER]
-    if not BarShown(db) then
+    local buffViewer, barViewer = _G[BUFF_VIEWER], _G[BUFF_BAR_VIEWER]
+    if not (preview or BarShown(db)) then
         -- La barra no se ve ahora (por ejemplo, fuera de combate): los buffs vuelven a su sitio
         for _, item in ipairs(ViewerItems(buffViewer)) do RestoreBuff(item) end
+        for _, item in ipairs(ViewerItems(barViewer)) do RestoreBuff(item) end
+        -- Lo que termine sin verse no se anuncia al volver (ni destello ni sonido de algo que acabó hace rato)
+        for _, f in pairs(icons) do
+            f.wasActive, f.lingerUntil = nil, nil
+            f.flash:Hide()
+        end
         bar:Hide()
         lastLine = nil
         return
     end
-    PlaceBar()
+    PlaceBar(db)
     -- La misma opacidad que la barra de esenciales (se elige en el modo de edición)
-    local anchor = _G.EssentialCooldownViewer
-    bar:SetAlpha(anchor and Plain(anchor:GetAlpha()) or 1)
+    local essential = _G.EssentialCooldownViewer
+    bar:SetAlpha(essential and Plain(essential:GetAlpha()) or 1)
+    local unlocked = ns.activeUnlocked == true
+    bar.label:SetText(L["Ruscuu: drag the bar"])
+    bar.mover:SetShown(unlocked)
     bar:Show()
+    -- Desbloqueada, la vista previa se repite para que siempre se vean los iconos girando
+    if unlocked and now - previewStart > PREVIEW_LENGTH then
+        previewStart = now
+        for _, f in pairs(icons) do f.style = nil end
+    end
 
-    local now = GetTime()
     local refresh, textures = cooldownsDirty, texturesDirty
     cooldownsDirty, texturesDirty = false, false
     local line = {}
     for _, entry in ipairs(entries) do
         local f = icons[entry.key]
-        local active, a, b, c
-        if entry.spell then
-            -- El rango que esté en cooldown (o el elegido, si ninguno lo está)
-            local id = Resolve(entry.spell)
-            active, a, b, c = SpellState(id)
-            if active ~= true then
-                for _, rank in ipairs(entry.ranks or {}) do
-                    local rid = Resolve(rank)
-                    if rid ~= id then
-                        local ra, r1, r2, r3 = SpellState(rid)
-                        if ra == true then
-                            id, active, a, b, c = rid, ra, r1, r2, r3
-                            break
+        if preview then
+            if textures then UpdateTexture(f) end
+            if f.style ~= "preview" then
+                f.style = "preview"
+                f.cd:SetCooldown(previewStart, PREVIEW_LENGTH) -- números propios, no del juego
+                f.durationKind = nil
+                f.cd:SetDrawSwipe(db.showSwipe)
+                f.icon:SetDesaturated(false)
+                f.count:Hide()
+            end
+            f.wasActive, f.lingerUntil = nil, nil
+            f:Show()
+            line[#line + 1] = f
+        else
+            local active, a, b, c
+            if entry.spell then
+                -- El rango que esté en cooldown (o el elegido, si ninguno lo está)
+                local id = Resolve(entry.spell)
+                active, a, b, c = SpellState(id)
+                if active ~= true then
+                    for _, rank in ipairs(entry.ranks or {}) do
+                        local rid = Resolve(rank)
+                        if rid ~= id then
+                            local ra, r1, r2, r3 = SpellState(rid)
+                            if ra == true then
+                                id, active, a, b, c = rid, ra, r1, r2, r3
+                                break
+                            end
                         end
                     end
                 end
-            end
-            if id ~= f.spellID then
-                f.spellID = id
-                textures = true
-                f.style = nil
-            end
-        else
-            active, a, b = SlotState(entry.slot)
-        end
-        if textures then UpdateTexture(f) end
-        local known = active ~= nil
-        if not known then active = true end -- sin datos se muestra, como haría Blizzard
-
-        -- Estado nuevo: se vuelve a pedir el cooldown al juego
-        local style = tostring(active) .. tostring(a) .. tostring(b) .. tostring(c)
-        if refresh or style ~= f.style then
-            f.style = style
-            if entry.spell then
-                ApplySpellCooldown(f, db, known and active, a, b, c)
+                if id ~= f.spellID then
+                    f.spellID = id
+                    textures = true
+                    f.style = nil
+                end
+            elseif entry.slot then
+                active, a, b = SlotState(entry.slot)
             else
-                ApplySlotCooldown(f, db, known and active, a, b)
+                active, a, b = ItemState(entry.item)
             end
-        end
+            if textures then UpdateTexture(f) end
+            local known = active ~= nil
+            if not known then active = true end -- sin datos se muestra, como haría Blizzard
 
-        if active and not f.wasActive then f.activeSince = now end
-        if f.wasActive and not active and db.activeFlash and now - (f.activeSince or now) >= MIN_FLASH then
-            f.lingerUntil = now + LINGER -- acaba de terminar: un momento visible con destello
+            -- Estado nuevo: se vuelve a pedir el cooldown al juego
+            local style = tostring(active) .. tostring(a) .. tostring(b) .. tostring(c)
+            if refresh or style ~= f.style then
+                f.style = style
+                if entry.spell then
+                    ApplySpellCooldown(f, db, known and active, a, b, c)
+                else
+                    ApplySlotCooldown(f, db, known and active, a, b)
+                end
+            end
+
+            if active and not f.wasActive then f.activeSince = now end
+            -- Acaba de terminar (tras más que un GCD): un momento visible con destello, y sonido si se eligió
+            if f.wasActive and not active and now - (f.activeSince or now) >= MIN_FLASH then
+                if db.activeFlash then f.lingerUntil = now + LINGER end
+                if db.activeSound[entry.key] then ns.PlayActiveSound(db.activeSoundChoice) end
+            end
+            f.wasActive = active
+            if f.lingerUntil and (now >= f.lingerUntil or active) then f.lingerUntil = nil end
+            local show = active or f.lingerUntil ~= nil
+            f:SetShown(show)
+            if show then line[#line + 1] = f end
         end
-        f.wasActive = active
-        if f.lingerUntil and (now >= f.lingerUntil or active) then f.lingerUntil = nil end
-        local show = active or f.lingerUntil ~= nil
-        f:SetShown(show)
-        if show then line[#line + 1] = f end
     end
 
     -- Buffs del Cooldown Manager (iconos) en la misma línea, después de los cooldowns
@@ -865,6 +1154,19 @@ local function Update()
             SetHidden(item, false)
             line[#line + 1] = BuffSlot(item)
         elseif buffsOn then
+            SetHidden(item, true)
+        else
+            RestoreBuff(item)
+        end
+    end
+    -- Buffs que Blizzard muestra como barras: en la línea como icono, con el tiempo restante encima
+    local barsOn = db.activeBuffs and db.activeBuffBars and barViewer ~= nil and Shown(barViewer) and not NameOnly(barViewer)
+    for _, item in ipairs(ViewerItems(barViewer)) do
+        if barsOn and item.Icon and BuffActive(item, barViewer) then
+            SetHidden(item, false)
+            Compact(item, true)
+            line[#line + 1] = BuffSlot(item, true)
+        elseif barsOn and item.Icon then
             SetHidden(item, true)
         else
             RestoreBuff(item)
@@ -934,10 +1236,12 @@ end
 
 local events = CreateFrame("Frame")
 local COOLDOWN_EVENTS = { SPELL_UPDATE_COOLDOWN = true, SPELL_UPDATE_CHARGES = true, SPELL_UPDATE_ICON = true,
-    ACTIONBAR_UPDATE_COOLDOWN = true, BAG_UPDATE_COOLDOWN = true, PLAYER_ENTERING_WORLD = true,
-    PLAYER_REGEN_DISABLED = true, PLAYER_REGEN_ENABLED = true }
+    ACTIONBAR_UPDATE_COOLDOWN = true, BAG_UPDATE_COOLDOWN = true, BAG_UPDATE_DELAYED = true,
+    PLAYER_ENTERING_WORLD = true, PLAYER_REGEN_DISABLED = true, PLAYER_REGEN_ENABLED = true,
+    PLAYER_MOUNT_DISPLAY_CHANGED = true, PLAYER_UPDATE_RESTING = true }
 local LIST_EVENTS = { SPELLS_CHANGED = true, PLAYER_EQUIPMENT_CHANGED = true, PLAYER_SPECIALIZATION_CHANGED = true,
-    PLAYER_TALENT_UPDATE = true, TRAIT_CONFIG_UPDATED = true, UNIT_PET = true, PET_BAR_UPDATE = true }
+    PLAYER_TALENT_UPDATE = true, TRAIT_CONFIG_UPDATED = true, UNIT_PET = true, PET_BAR_UPDATE = true,
+    GET_ITEM_INFO_RECEIVED = true }
 for event in pairs(COOLDOWN_EVENTS) do pcall(events.RegisterEvent, events, event) end
 for event in pairs(LIST_EVENTS) do
     if event == "UNIT_PET" then
@@ -946,7 +1250,7 @@ for event in pairs(LIST_EVENTS) do
         pcall(events.RegisterEvent, events, event)
     end
 end
-events:SetScript("OnEvent", function(_, event)
+events:SetScript("OnEvent", function(_, event, itemID)
     if LIST_EVENTS[event] then
         entriesDirty = true
     elseif event == "SPELL_UPDATE_ICON" then
@@ -954,8 +1258,18 @@ events:SetScript("OnEvent", function(_, event)
     else
         cooldownsDirty = true
     end
-    if not (ns.db and ns.db.activeOnly) then return end
+    -- Se anota siempre, aunque la barra esté desactivada: así, al activarla, los cooldowns ya en marcha salen
     if event == "SPELL_UPDATE_COOLDOWN" or event == "PLAYER_ENTERING_WORLD" then pcall(CaptureGCD) end
+    -- Al entrar en combate la barra deja de estar desbloqueada (la vista previa taparía los cooldowns reales)
+    if event == "PLAYER_REGEN_DISABLED" and ns.activeUnlocked then
+        ns.SetActiveUnlocked(false)
+        if ns.RefreshOptions then ns.RefreshOptions() end
+    end
+    if event == "GET_ITEM_INFO_RECEIVED" then
+        if not (ns.db and ns.db.activeItems[itemID]) then return end
+        if ns.RefreshOptions then ns.RefreshOptions() end -- el nombre del objeto ya está
+    end
+    if not (ns.db and ns.db.activeOnly) then return end
     SafeUpdate()
 end)
 
@@ -963,7 +1277,7 @@ end)
 -- los buffs y se rehace la línea al momento
 function ns.HookActiveViewer(viewer)
     if type(viewer.Layout) ~= "function" then return end
-    local isBuffs = _G[BUFF_VIEWER] == viewer
+    local isBuffs = _G[BUFF_VIEWER] == viewer or _G[BUFF_BAR_VIEWER] == viewer
     local known = isBuffs
     for _, name in ipairs(COOLDOWN_VIEWERS) do
         if _G[name] == viewer then known = true end
@@ -982,6 +1296,10 @@ function ns.HookActiveViewer(viewer)
         lastLine = nil
         SafeUpdate()
     end)
+    -- Blizzard cambia qué hechizo muestra cada icono sin recolocarlos si su número no cambia
+    if not isBuffs and type(viewer.RefreshData) == "function" then
+        hooksecurefunc(viewer, "RefreshData", function() entriesDirty = true end)
+    end
 end
 
 -- Se llama al cambiar las opciones (y al cambiar de perfil): estilo, tamaño y lista de hechizos
@@ -1017,4 +1335,77 @@ end
 -- Nombre de una entrada para la lista de opciones
 function ns.TrinketLabel(i)
     return L["Trinket %d"]:format(i)
+end
+
+-- Botón "Probar": la barra se llena con los iconos elegidos durante unos segundos. Devuelve false si no hay nada
+function ns.PreviewActiveBar(seconds)
+    if not ns.db then return false end
+    ReadCDMSpells()
+    if #BuildEntries() == 0 then return false end
+    previewStart = GetTime()
+    previewUntil = previewStart + (seconds or PREVIEW_LENGTH)
+    entriesDirty, layoutDirty = true, true
+    for _, f in pairs(icons) do f.style = nil end
+    SafeUpdate()
+    return true
+end
+
+-- Desbloquear para arrastrar la barra con el ratón (no se guarda: al recargar vuelve a estar bloqueada)
+function ns.SetActiveUnlocked(on)
+    ns.activeUnlocked = on and true or nil
+    if on then previewStart = 0 end
+    entriesDirty, layoutDirty = true, true
+    SafeUpdate()
+end
+
+-- Lo que hay en la barra, en su orden (para la página de orden y sonido)
+function ns.GetActiveEntryList()
+    local list = {}
+    if not ns.db then return list end
+    ReadCDMSpells()
+    for _, e in ipairs(BuildEntries()) do
+        local name, icon, ok, tex
+        if e.spell then
+            name = SpellName(e.spell)
+            ok, tex = pcall(C_Spell.GetSpellTexture, e.spell)
+        elseif e.slot then
+            for i, slot in ipairs(ns.TRINKET_SLOTS) do
+                if slot == e.slot then name = ns.TrinketLabel(i) end
+            end
+            ok, tex = pcall(GetInventoryItemTexture, "player", e.slot)
+        else
+            name = ItemName(e.item)
+            ok, tex = true, ns.ActiveItemIcon(e.item)
+        end
+        if ok and not ns.IsSecret(tex) then icon = tex end
+        list[#list + 1] = { key = e.key, name = name or e.key, icon = icon }
+    end
+    return list
+end
+
+-- Sube (delta -1) o baja (delta 1) un icono en la barra. Devuelve false si ya estaba en el borde.
+function ns.MoveActiveEntry(key, delta)
+    local list = ns.GetActiveEntryList()
+    local index
+    for i, e in ipairs(list) do
+        if e.key == key then index = i end
+    end
+    local target = index and index + delta
+    if not target or target < 1 or target > #list then return false end
+    list[index], list[target] = list[target], list[index]
+    local order, present = {}, {}
+    for i, e in ipairs(list) do
+        order[i] = e.key
+        present[e.key] = true
+    end
+    -- Lo que ahora no está en la barra (un abalorio desmarcado, hechizos de otra especialización) conserva su sitio
+    for _, saved in ipairs(ns.db.activeOrder) do
+        if type(saved) == "string" and not present[saved] then
+            order[#order + 1] = saved
+            present[saved] = true
+        end
+    end
+    ns.db.activeOrder = order
+    ns.RefreshActiveBar()
+    return true
 end

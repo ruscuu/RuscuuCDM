@@ -64,6 +64,10 @@ function Object:GetEffectiveScale()
 end
 function Object:SetMouseMotionEnabled(on) self._mouseMotion = on and true or false end
 function Object:IsMouseMotionEnabled() return self._mouseMotion ~= false end
+function Object:EnableMouse(on) self._mouse = on and true or false end
+function Object:IsMouseEnabled() return self._mouse == true end
+function Object:SetFrameStrata(strata) self._strata = strata end
+function Object:GetFrameStrata() return self._strata or (self._parent and self._parent:GetFrameStrata()) or "MEDIUM" end
 function Object:GetNumPoints() return self._points and #self._points or 0 end
 function Object:SetTextColor(r, g, b, a) self._color = { r, g, b, a } end
 function Object:GetTextColor() if self._color then return unpack(self._color) end return 1, 1, 1, 1 end

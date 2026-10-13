@@ -108,13 +108,17 @@ assert(ns.db.activeAdd[210] and ns.db.activeRemove[100], "se guarda lo elegido")
 assert(r[210]:GetChecked() and not r[100]:GetChecked(), "las casillas siguen lo elegido")
 
 -- Buscador
-local search, add
+local search, add, itemBox
 for _, f in ipairs(M.frames) do
     if f._type == "EditBox" and f._parent == page.content then
-        if f._scripts.OnTextChanged then search = f elseif f._scripts.OnEnterPressed then add = f end
+        if f._scripts.OnTextChanged then
+            search = f
+        elseif f._scripts.OnEnterPressed and not f.plus then -- los de los deslizadores tienen botones - y +
+            if add then itemBox = f else add = f end
+        end
     end
 end
-assert(search and add, "cuadros de buscar y añadir")
+assert(search and add and itemBox, "cuadros de buscar, añadir hechizo y añadir objeto")
 search:SetText("portal"); search:Fire("OnTextChanged", true)
 r = rows()
 assert(r[300] and not r[210] and not r[100], "el buscador filtra por nombre")
@@ -131,6 +135,24 @@ assert(rows()[642] and headers():find("Añadidos a mano %(1%)"), "sale en su sec
 add:SetText("99999"); add:Fire("OnEnterPressed")
 print = realPrint
 assert(not ns.db.activeAdd[99999] and printed[#printed]:find("99999"), "un hechizo que no existe no se añade")
+
+-- Añadir un objeto por número o nombre: sale en su sección y se puede quitar
+C_Item = {
+    GetItemInfoInstant = function(x) if x == 5512 or x == "Piedra de salud" then return 5512 end end,
+    GetItemNameByID = function(id) if id == 5512 then return "Piedra de salud" end end,
+    GetItemIconByID = function() return 3000 end,
+    GetItemCount = function() return 3 end,
+}
+print = function(msg) printed[#printed + 1] = msg end
+itemBox:SetText("Piedra de salud"); itemBox:Fire("OnEnterPressed")
+assert(ns.db.activeItems[5512] and itemBox:GetText() == "", "objeto añadido por nombre")
+itemBox:SetText("123"); itemBox:Fire("OnEnterPressed")
+print = realPrint
+assert(not ns.db.activeItems[123] and printed[#printed]:find("123"), "un objeto que no existe no se añade")
+assert(headers():find("Objetos %(1%)") and rows()[5512], "sale en la sección Objetos: " .. headers())
+rows()[5512]:SetChecked(false); rows()[5512]:Fire("OnClick")
+assert(not ns.db.activeItems[5512], "desmarcarlo lo quita")
+ns.db.activeItems[5512] = true
 
 -- La barra usa lo elegido: el de la mascota, por su hueco
 ns.SetActiveSpellChosen(400, true)
@@ -153,6 +175,51 @@ onCooldown[200] = nil
 M.FireEvent("SPELL_UPDATE_COOLDOWN")
 M.Tick(1.5)
 assert(not golpe:IsShown(), "y se va cuando termina")
+
+-- Página de orden y sonido: subir, bajar y sonido por hechizo
+local orderPage
+for _, p in ipairs(pages) do
+    if p.titleKey == "Active cooldowns: order and sound" then orderPage = p end
+end
+assert(orderPage, "hay una página de orden y sonido")
+orderPage._width = 640
+orderPage:Show(); orderPage:Fire("OnShow")
+local function orderRows()
+    local found = {}
+    for _, f in ipairs(M.frames) do
+        if f._parent == orderPage.content and f.key and f:IsShown() then found[#found + 1] = f end
+    end
+    table.sort(found, function(a, b) return select(3, a:GetPoint(1)) > select(3, b:GetPoint(1)) end)
+    return found
+end
+local function keys()
+    local found = {}
+    for _, row in ipairs(orderRows()) do found[#found + 1] = row.key end
+    return table.concat(found, " ")
+end
+assert(keys() == "spell210 spell400 spell642 item5512", "orden inicial: " .. keys())
+orderRows()[4].up:Fire("OnClick")
+assert(keys() == "spell210 spell400 item5512 spell642", "subir: " .. keys())
+orderRows()[1].down:Fire("OnClick")
+assert(keys() == "spell400 spell210 item5512 spell642", "bajar: " .. keys())
+assert(ns.db.activeOrder[1] == "spell400", "el orden se guarda en el perfil")
+-- Mover no pierde el sitio de lo que ahora no está en la barra
+table.insert(ns.db.activeOrder, 2, "slot13")
+ns.MoveActiveEntry("spell642", -1)
+local savedOrder = table.concat(ns.db.activeOrder, " ")
+assert(savedOrder:find("slot13"), "el abalorio desmarcado conserva su sitio: " .. savedOrder)
+ns.RefreshActiveBar()
+assert(ns.CountActiveEntries() == 4, "la barra tiene los cuatro")
+local r1 = orderRows()[1]
+r1.sound:SetChecked(true); r1.sound:Fire("OnClick")
+assert(ns.db.activeSound.spell400, "sonido marcado")
+-- Exportar e importar conserva el orden, el sonido y los objetos
+local orderBefore = table.concat(ns.db.activeOrder, " ")
+local text = ns.ExportProfile()
+ns.db.activeOrder, ns.db.activeSound, ns.db.activeItems = {}, {}, {}
+assert(ns.ImportProfile(text), "importa")
+assert(table.concat(ns.db.activeOrder, " ") == orderBefore and ns.db.activeSound.spell400 and ns.db.activeItems[5512],
+    "importar recupera orden, sonido y objetos: " .. table.concat(ns.db.activeOrder, " "))
 
 -- Valores por defecto de la página: vuelve todo como al principio
 ns.ResetKeys(page.resetKeys)

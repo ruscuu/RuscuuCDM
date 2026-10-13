@@ -151,6 +151,16 @@ ns.PROFILE_DEFAULTS = {
     activeFlash = true,                       -- al terminar, el icono se queda un segundo con un destello
     activeBuffs = true,                       -- los buffs activos del Cooldown Manager van en la misma línea
     activeShow = "blizzard",                  -- cuándo se ve: blizzard (como esenciales) | always | combat | hidden
+    activeBuffBars = true,                    -- los buffs en barra también, como icono con el tiempo encima
+    activeHideMounted = false,                -- ocultar en montura o vehículo
+    activeHideResting = false,                -- ocultar descansando (posadas y ciudades)
+    activeAnchor = "essential",               -- sobre la barra de esenciales | screen (libre en la pantalla)
+    activeX = 0,                              -- desplazamiento desde el ancla
+    activeY = 0,
+    activeItems = {},                         -- [itemID] = true: objetos en la barra (pociones, piedras de salud...)
+    activeOrder = {},                         -- claves ("spell123", "slot13", "item5512") en el orden elegido
+    activeSound = {},                         -- [clave] = true: suena al estar listo
+    activeSoundChoice = "ready",              -- ready | warning | alarm | ping
     activeSize = 40,                          -- tamaño de los iconos de la barra
     activeSpacing = 4,                        -- separación entre iconos
     activeCDM = true,                         -- incluir los hechizos de esenciales y utilidad
@@ -232,6 +242,8 @@ ns.LIMITS = {
     buffEndSeconds = { 1, 60 },
     activeSize = { 20, 80 },
     activeSpacing = { 0, 20 },
+    activeX = { -1500, 1500 },
+    activeY = { -1500, 1500 },
 }
 
 -- Valores permitidos para las opciones de lista (los usa la importación)
@@ -245,6 +257,8 @@ ns.CHOICES = {
     keybindAnchor = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true },
     expirePulse = { none = true, pulse = true, flash = true },
     activeShow = { blizzard = true, always = true, combat = true, hidden = true },
+    activeAnchor = { essential = true, screen = true },
+    activeSoundChoice = { ready = true, warning = true, alarm = true, ping = true },
 }
 
 -- Ajustes de la cuenta (no dependen del perfil)
