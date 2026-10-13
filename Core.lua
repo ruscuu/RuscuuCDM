@@ -272,6 +272,7 @@ local GLOBAL_DEFAULTS = {
     minimap = { hide = false, angle = 225, lock = false },
     profiles = {},
     chars = {},
+    classProfiles = {},              -- [CLASE] = perfil propio de esa clase (para que no se mezclen sus hechizos)
 }
 
 ------------------------------------------------------------------------

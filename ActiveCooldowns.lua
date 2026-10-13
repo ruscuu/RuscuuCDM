@@ -272,6 +272,39 @@ local function RebuildPetSlots()
     end
 end
 
+-- ¿Conoce el personaje este hechizo? true / false, o nil si el juego no deja saberlo.
+-- Los perfiles pueden compartirse entre personajes: así un hechizo de otra clase nunca sale en la barra.
+function ns.PlayerKnowsSpell(spellID)
+    if petSlots[spellID] then return true end
+    local checks = {
+        IsPlayerSpell and function() return IsPlayerSpell(spellID) end,
+        IsSpellKnown and function() return IsSpellKnown(spellID) end,
+        IsSpellKnown and function() return IsSpellKnown(spellID, true) end, -- de la mascota
+        C_SpellBook and C_SpellBook.IsSpellKnown and function() return C_SpellBook.IsSpellKnown(spellID) end,
+    }
+    local answered = false
+    for i = 1, 4 do
+        if checks[i] then
+            local ok, known = pcall(checks[i])
+            if ok and type(known) == "boolean" and not ns.IsSecret(known) then
+                if known then return true end
+                answered = true
+            end
+        end
+    end
+    if not answered then return nil end
+    -- Rangos y hechizos de menús desplegables: si está en el libro del personaje, lo conoce
+    local okBook, book = pcall(ns.GetSpellbookSpells)
+    local name = SpellName(spellID)
+    for _, sp in ipairs(okBook and book or {}) do
+        if sp.name == name then return true end
+        for _, id in ipairs(sp.ranks or {}) do
+            if id == spellID then return true end
+        end
+    end
+    return false
+end
+
 -- Busca un hechizo por su número o por su nombre; devuelve su número o nil
 function ns.FindSpell(text)
     text = strtrim(text or "")
@@ -340,7 +373,8 @@ local function BuildEntries()
     end
     local extras = {}
     for id, on in pairs(db.activeAdd) do
-        if on and type(id) == "number" and not seen[id] then extras[#extras + 1] = { id = id, name = SpellName(id) } end
+        -- Un hechizo que este personaje no conoce (de otra clase que usa el mismo perfil) no sale
+        if on and type(id) == "number" and not seen[id] and ns.PlayerKnowsSpell(id) ~= false then extras[#extras + 1] = { id = id, name = SpellName(id) } end
     end
     table.sort(extras, function(a, b)
         if a.name ~= b.name then return a.name < b.name end

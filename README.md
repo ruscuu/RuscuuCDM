@@ -17,7 +17,7 @@ It only changes how things look — it never reads combat data, so it follows Fo
 - **Cooldown numbers** on the Cooldown Manager and action bars: font, size, outline and color for every text.
 - Works with **Bartender4, Dominos and ElvUI** action bars.
 - **Themes:** Ruscuu Neon, Minimal, Dark, Class color and Blizzard style.
-- **Profiles per specialization** that switch automatically, plus rename, duplicate and reset.
+- **Profiles per specialization** that switch automatically, plus rename, duplicate and reset. Each class starts with its own profile, so spells never mix between characters.
 - **Import / Export** your style as a text string to share it.
 - Options with live preview, help on every control, values you can type and a Defaults button on each page.
 - Minimap button with the Ruscuu bear (round or square minimaps).
@@ -54,7 +54,7 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 - **Números de cooldown** en el Cooldown Manager y en las barras de acción: fuente, tamaño, contorno y color de cada texto.
 - Funciona con las barras de **Bartender4, Dominos y ElvUI**.
 - **Temas:** Ruscuu Neón, Minimalista, Oscuro, Color de clase y Estilo Blizzard.
-- **Perfiles por especialización** que cambian solos, además de renombrar, duplicar y restablecer.
+- **Perfiles por especialización** que cambian solos, además de renombrar, duplicar y restablecer. Cada clase empieza con su propio perfil, así los hechizos no se mezclan entre personajes.
 - **Importar / Exportar** tu estilo como texto para compartirlo.
 - Opciones con vista previa en vivo, ayuda en cada control, valores que se pueden escribir y botón de valores por defecto en cada página.
 - Botón en el minimapa con el oso Ruscuu (minimapa redondo o cuadrado).
