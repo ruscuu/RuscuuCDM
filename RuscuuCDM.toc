@@ -11,6 +11,7 @@
 ## Version: @project-version@
 ## IconTexture: Interface\AddOns\RuscuuCDM\Media\icon
 ## X-Curse-Project-ID: 1736628
+## X-Wago-ID: bGoYQY60
 ## X-License: MIT
 ## SavedVariables: RuscuuCDMDB
 ## AddonCompartmentFunc: RuscuuCDM_OnAddonCompartmentClick

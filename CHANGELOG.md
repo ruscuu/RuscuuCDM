@@ -11,6 +11,9 @@
 - **Buff bars too**: buffs that the Cooldown Manager shows as bars go into the line as an icon, with their time left on it.
 - **Hide when mounted** (or in a vehicle) and **hide while resting**.
 
+**Other**
+- The addon is now also published on Wago Addons.
+
 ## v0.5.2
 
 **Fixed**
