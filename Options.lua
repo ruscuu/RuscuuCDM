@@ -99,6 +99,19 @@ local function ActiveShowOptions()
     }
 end
 
+local function AnchorOptions()
+    return {
+        { value = "essential", text = L["On the essential cooldowns"] },
+        { value = "screen", text = L["Free on the screen"] },
+    }
+end
+
+local function SoundOptions()
+    local list = {}
+    for _, sound in ipairs(ns.ACTIVE_SOUNDS) do list[#list + 1] = { value = sound.key, text = L[sound.nameKey] } end
+    return list
+end
+
 local function TriStateOptions()
     return {
         { value = "blizzard", text = L["Blizzard default"] },
@@ -965,10 +978,36 @@ local function BuildActive(ui, panel)
         L["The active buffs of the Cooldown Manager (icons) go after the cooldowns, at the same size."])
     ui:DBChoice(2, L["Show the bar"], "activeShow", ActiveShowOptions,
         L["When the bar is shown. \"Like the essential cooldowns\" follows the visibility chosen for them in Edit Mode."])
-    ui:Next(56)
+    ui:Next(30)
+    ui:DBCheck(1, L["Buff bars too (as icons)"], "activeBuffBars",
+        L["Buffs that the Cooldown Manager shows as bars go into the line as an icon, with their time left on it."])
+    ui:Next(30)
+    ui:DBCheck(1, L["Hide when mounted"], "activeHideMounted",
+        L["Hides the bar while you are mounted or in a vehicle."])
+    ui:DBCheck(2, L["Hide while resting"], "activeHideResting",
+        L["Hides the bar in inns and cities."])
+    ui:Next(32)
     ui:Slider(1, L["Icon size"], "activeSize", 1, FormatPixels)
     ui:Slider(2, L["Spacing"], "activeSpacing", 1, FormatPixels)
     ui:Next(48)
+
+    ui:Section(L["Position"])
+    ui:DBChoice(1, L["Anchor"], "activeAnchor", AnchorOptions,
+        L["On the essential cooldowns: the bar moves with them in Edit Mode. Free on the screen: it has its own place."])
+    ui:Check(2, L["Unlock to drag"],
+        function() return ns.activeUnlocked end,
+        function(on) SafeCall(ns.SetActiveUnlocked, on) end,
+        L["Shows the bar with your icons so you can drag it with the mouse. Lock it again when you are done."])
+    ui:Next(56)
+    ui:Slider(1, L["Horizontal position"], "activeX", 1, FormatNumber)
+    ui:Slider(2, L["Vertical position"], "activeY", 1, FormatNumber)
+    ui:Next(48)
+    ui:Button(1, L["Test for 10 seconds"], 200, function()
+        if not ns.PreviewActiveBar(10) then
+            ns.Print(L["Choose some spells first: the bar has nothing to show."], true)
+        end
+    end, L["Fills the bar with your chosen spells as if they were on cooldown, so you can see the size, spacing and position."])
+    ui:Next(36)
 
     ui:Section(L["Spells in the bar"])
     _, h = ui:Note(L["Check the spells that can appear in the bar: any spell of your spellbook, or any other by its ID or name. The choice is saved in the active profile."])
@@ -982,6 +1021,13 @@ local function BuildActive(ui, panel)
         local cdm = { title = L["Cooldown Manager"], spells = {} }
         local book = { title = L["Spellbook"], spells = {} }
         local added = { title = L["Added by ID or name"], spells = {} }
+        local items = { title = L["Items"], spells = {} }
+        for id, on in pairs(ns.db.activeItems) do
+            if on and type(id) == "number" then
+                items.spells[#items.spells + 1] = { kind = "item", spellID = id, name = ns.ActiveItemName(id),
+                    icon = ns.ActiveItemIcon(id) }
+            end
+        end
         for _, id in ipairs(ns.GetCDMSpellIDs()) do
             if not seen[id] then
                 seen[id] = true
@@ -1010,6 +1056,7 @@ local function BuildActive(ui, panel)
         end
         table.sort(book.spells, byName)
         table.sort(added.spells, byName)
+        table.sort(items.spells, byName)
 
         local needle = strtrim(filter):lower()
         local function matches(sp)
@@ -1017,7 +1064,7 @@ local function BuildActive(ui, panel)
         end
 
         local y, rowCount, headerCount = listTop, 0, 0
-        for _, g in ipairs({ cdm, book, added }) do
+        for _, g in ipairs({ cdm, book, added, items }) do
             local list = {}
             for _, sp in ipairs(g.spells) do
                 if matches(sp) then list[#list + 1] = sp end
@@ -1039,6 +1086,11 @@ local function BuildActive(ui, panel)
                     local row = rows[rowCount]
                     if not row then
                         row = NewSpellRow(ui, function(self, on)
+                            if self.kind == "item" then
+                                ns.db.activeItems[self.spellID] = on or nil
+                                ns.RefreshActiveBar()
+                                return
+                            end
                             if on then
                                 ns.SetActiveSpellChosen(self.spellID, true)
                             else
@@ -1054,7 +1106,12 @@ local function BuildActive(ui, panel)
                     row:ClearAllPoints()
                     row:SetPoint("TOPLEFT", ui:X(col) - 4, y - math.floor((i - 1) / 2) * 28)
                     row.ranks = sp.ranks or { sp.spellID }
-                    ShowSpellRow(row, sp, AnyRankChosen(row.ranks))
+                    row.kind = sp.kind
+                    if sp.kind == "item" then
+                        ShowSpellRow(row, sp, ns.db.activeItems[sp.spellID] == true)
+                    else
+                        ShowSpellRow(row, sp, AnyRankChosen(row.ranks))
+                    end
                 end
                 y = y - math.ceil(#list / 2) * 28 - 8
             end
@@ -1096,9 +1153,104 @@ local function BuildActive(ui, panel)
         ns.Print(L["Added to the active cooldowns bar: %s"]:format(SpellName(id)), true)
     end, nil, L["Type a spell ID (for example 642) or the exact name of a spell and press Enter."])
     ui:Next(54)
+    local itemBox
+    itemBox = ui:EditBox(2, L["Add an item by ID or name"], function(text)
+        local id = ns.FindItem(text)
+        if not id then
+            ns.Print(L["Item not found: %s"]:format(strtrim(text or "")), true)
+            return
+        end
+        ns.db.activeItems[id] = true
+        itemBox:SetText("")
+        ns.RefreshActiveBar()
+        Rebuild()
+        ns.Print(L["Added to the active cooldowns bar: %s"]:format(ns.ActiveItemName(id)), true)
+    end, nil, L["Type an item ID (for example 5512, a healthstone) or the exact name of an item in your bags and press Enter."])
+    ui:Next(54)
     listTop = ui.y
     emptyNote = ui:Note(L["No spells found. Enable the Cooldown Manager or type a spell above."])
     emptyNote:Hide()
+    panel.onShow = Rebuild
+    OnRefresh(function() if panel:IsVisible() then Rebuild() end end)
+end
+
+------------------------------------------------------------------------
+-- Página Cooldowns activos: orden y sonido
+------------------------------------------------------------------------
+
+local function BuildActiveOrder(ui, panel)
+    local _, h = ui:Note(L["The icons go in this order, from left to right. Mark \"Sound\" to hear one when that cooldown is ready."])
+    ui:Next(h)
+    ui:DBChoice(1, L["Sound"], "activeSoundChoice", SoundOptions)
+    ui:Next(18)
+    ui:Button(2, L["Test sound"], 160, function() ns.PlayActiveSound(ns.db.activeSoundChoice) end)
+    ui:Next(42)
+    local listTop = ui.y
+    local rows = {}
+    local emptyNote = ui:Note(L["No spells in the bar yet. Choose them on the Active cooldowns page."])
+    emptyNote:Hide()
+
+    local Rebuild
+    local function NewRow()
+        local row = CreateFrame("Frame", nil, ui.content)
+        row:SetSize(ui.width - 32, 26)
+        row.icon = row:CreateTexture(nil, "ARTWORK")
+        row.icon:SetSize(20, 20)
+        row.icon:SetPoint("LEFT", 0, 0)
+        row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        row.number = row:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        row.number:SetPoint("RIGHT", row.icon, "LEFT", -6, 0)
+        row.name = row:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        row.name:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
+        row.name:SetWidth(220)
+        row.name:SetJustifyH("LEFT")
+        row.name:SetWordWrap(false)
+        local function button(text, x, delta)
+            local b = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            b:SetSize(70, 22)
+            b:SetPoint("LEFT", row, "LEFT", x, 0)
+            b:SetText(text)
+            b:SetScript("OnClick", function()
+                SafeCall(ns.MoveActiveEntry, row.key, delta)
+                Rebuild()
+            end)
+            return b
+        end
+        row.up = button(L["Up"], 260, -1)
+        row.down = button(L["Down"], 336, 1)
+        row.sound = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+        row.sound:SetSize(24, 24)
+        row.sound:SetPoint("LEFT", row, "LEFT", 420, 0)
+        row.sound.Text:SetFontObject("GameFontHighlight")
+        row.sound.Text:SetText(L["Sound"])
+        row.sound:SetScript("OnClick", function(self)
+            local on = self:GetChecked() and true or false
+            PlayClick(on)
+            ns.db.activeSound[row.key] = on or nil
+        end)
+        return row
+    end
+
+    Rebuild = function()
+        local list = ns.GetActiveEntryList()
+        for i, e in ipairs(list) do
+            local row = rows[i] or NewRow()
+            rows[i] = row
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", 40, listTop - (i - 1) * 30)
+            row.key = e.key
+            row.icon:SetTexture(e.icon or 134400)
+            row.number:SetText(i)
+            row.name:SetText(e.name)
+            row.up:SetEnabled(i > 1)
+            row.down:SetEnabled(i < #list)
+            row.sound:SetChecked(ns.db.activeSound[e.key] == true)
+            row:Show()
+        end
+        for i = #list + 1, #rows do rows[i]:Hide() end
+        emptyNote:SetShown(#list == 0)
+        ui.content:SetHeight(-listTop + math.max(#list, 1) * 30 + 30)
+    end
     panel.onShow = Rebuild
     OnRefresh(function() if panel:IsVisible() then Rebuild() end end)
 end
@@ -1359,8 +1511,15 @@ local SUBPAGES = {
     {
         key = "active", titleKey = "Active cooldowns", descKey = "Only the cooldowns that are running, in one centered bar.",
         build = BuildActive,
-        resetKeys = { "activeOnly", "activeFlash", "activeBuffs", "activeShow", "activeSize", "activeSpacing", "activeCDM",
+        resetKeys = { "activeOnly", "activeFlash", "activeBuffs", "activeShow", "activeBuffBars", "activeHideMounted",
+            "activeHideResting", "activeAnchor", "activeX", "activeY", "activeItems", "activeSize", "activeSpacing", "activeCDM",
             "activeAdd", "activeRemove", "activeTrinket1", "activeTrinket2" },
+    },
+    {
+        key = "activeorder", titleKey = "Active cooldowns: order and sound",
+        descKey = "The order of the icons in the bar, and a sound when a cooldown is ready.",
+        build = BuildActiveOrder,
+        resetKeys = { "activeOrder", "activeSound", "activeSoundChoice" },
     },
     {
         key = "texts", titleKey = "Texts and numbers", descKey = "Font, countdown numbers, charges, keybinds and bar texts.",

@@ -57,6 +57,18 @@ GetInventoryItemCooldown = function(_, slot)
 end
 GetInventoryItemTexture = function(_, slot) return 2000 + slot end
 GameTooltip = M.CreateFrame("GameTooltip", "GameTooltip")
+-- Objetos (pociones, piedras de salud): su cooldown no es secreto
+local itemCooldown = { start = 0, duration = 0, enable = 1 }
+C_Container = { GetItemCooldown = function() return itemCooldown.start, itemCooldown.duration, itemCooldown.enable end }
+C_Item = {
+    GetItemNameByID = function(id) return "Objeto " .. id end,
+    GetItemIconByID = function(id) return 4000 + id end,
+    GetItemCount = function() return 2 end,
+}
+-- Sonidos que suenan
+local played = {}
+SOUNDKIT = { READY_CHECK = 8960 }
+PlaySound = function(kit) played[#played + 1] = kit end
 
 local ns = {}
 M.Load(ns, "Locales.lua", "Core.lua", "Skin.lua", "ActiveCooldowns.lua")
@@ -95,7 +107,16 @@ local e1, e2, e3 = item(essential, 1, 1), item(essential, 2, 2), item(essential,
 local u1, u2 = item(utility, 1, 4), item(utility, 2, 5)
 local b1, b2 = item(buffs, 1, 900), item(buffs, 2, 901)
 b1.isActive, b2.isActive = false, false
-essential:Layout(); utility:Layout(); buffs:Layout()
+-- Buffs como barras: un icono de 30 a la izquierda y la barra (con el tiempo restante) a su derecha
+local barsViewer = viewer("BuffBarCooldownViewer", 1)
+local bb = M.CreateFrame("Frame", nil, barsViewer)
+bb.layoutIndex, bb._width, bb._height, bb.isActive = 1, 220, 30, false
+bb.Icon = M.CreateFrame("Frame", nil, bb); bb.Icon._width, bb.Icon._height = 30, 30
+bb.Bar = M.CreateFrame("StatusBar", nil, bb)
+bb.Bar.Duration = bb.Bar:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+bb.Bar.Duration:SetPoint("RIGHT", bb.Bar, "RIGHT", -8, 0)
+bb:SetMouseMotionEnabled(true)
+essential:Layout(); utility:Layout(); buffs:Layout(); barsViewer:Layout()
 ns.HookViewers()
 
 local bar = ns.GetActiveBar()
@@ -309,6 +330,23 @@ b1.isActive = true
 b1:SetScale(1)
 buffs:Layout()
 assert(near(b1:GetScale(), 1.25) and near(x(b1), 27 / 1.25), "tras el Layout de Blizzard sigue en la línea")
+-- Buffs que Blizzard muestra como barras: en la línea solo su icono, al tamaño de la barra, con el tiempo encima
+bb.isActive = true
+M.Tick(0.2)
+assert(bb.Bar:GetAlpha() == 0 and bb.Bar.Duration:GetParent() == bb.Icon, "la barra se oculta y el tiempo va sobre el icono")
+assert(not bb:IsMouseMotionEnabled(), "sin ayuda en la barra invisible")
+assert(near(bb:GetScale(), 50 / 30), "el icono de la barra al tamaño de la barra: " .. bb:GetScale())
+local bpoint, brel = bb:GetPoint(1)
+assert(bpoint == "LEFT" and brel == bar, "colocado por el borde izquierdo de su icono")
+ns.db.activeBuffBars = false
+M.Tick(0.2)
+assert(bb.Bar:GetAlpha() == 1 and bb.Bar.Duration:GetParent() == bb.Bar and bb.Bar.Duration:GetPoint(1) == "RIGHT",
+    "sin la opción: la barra vuelve como estaba")
+assert(bb:GetPoint(1) == "TOPLEFT" and near(bb:GetScale(), 1) and bb:IsMouseMotionEnabled(), "y en su sitio de Blizzard")
+ns.db.activeBuffBars = true
+bb.isActive = false
+M.Tick(0.2)
+
 -- Con la barra de buffs oculta Blizzard no recoloca nada: no se guardan las posiciones del addon como suyas
 buffs:Hide(); buffs:Layout(); buffs:Show()
 M.Tick(0.2)
@@ -350,6 +388,72 @@ ns.db.activeShow = "hidden"; M.Tick(0.2)
 assert(not bar:IsShown() and not blizzardShown(e1), "oculta: no se ve nada")
 ns.db.activeShow = "blizzard"; M.Tick(0.2)
 assert(bar:IsShown(), "como esenciales: vuelve")
+
+-- Montura y descanso: si se pide, la barra no se ve
+local mounted, resting = false, false
+IsMounted = function() return mounted end
+IsResting = function() return resting end
+ns.db.activeHideMounted, ns.db.activeHideResting = true, true
+mounted = true; M.Tick(0.2)
+assert(not bar:IsShown(), "en montura no se ve")
+mounted, resting = false, true; M.Tick(0.2)
+assert(not bar:IsShown(), "descansando no se ve")
+resting = false; M.Tick(0.2)
+assert(bar:IsShown(), "sin montura ni descanso se ve")
+ns.db.activeHideMounted, ns.db.activeHideResting = false, false
+
+-- Posición: libre en la pantalla con desplazamiento, o sobre esenciales; arrastrar guarda el desplazamiento
+ns.db.activeAnchor, ns.db.activeX, ns.db.activeY = "screen", 120, -40
+M.Tick(0.2)
+local point, rel, _, px, py = bar:GetPoint(1)
+assert(point == "CENTER" and rel == UIParent and px == 120 and py == -40, "libre en la pantalla con desplazamiento")
+ns.db.activeAnchor, ns.db.activeX, ns.db.activeY = "essential", 0, 10
+M.Tick(0.2)
+_, rel, _, px, py = bar:GetPoint(1)
+assert(rel == essential and px == 0 and py == 10, "sobre esenciales con desplazamiento")
+ns.SetActiveUnlocked(true)
+assert(bar:IsShown() and bar.bg:IsShown() and bar.label:IsShown(), "desbloqueada: fondo y rótulo para arrastrar")
+assert(icon("spell1"):IsShown() and icon("spell5"):IsShown(), "desbloqueada: se ven todos los iconos elegidos")
+function bar:GetCenter() return 530, 420 end
+function essential:GetCenter() return 500, 400 end
+bar:Fire("OnDragStop")
+assert(ns.db.activeX == 30 and ns.db.activeY == 20, "arrastrar guarda el desplazamiento: " .. ns.db.activeX .. "," .. ns.db.activeY)
+ns.SetActiveUnlocked(false)
+M.Tick(0.2)
+assert(not bar.bg:IsShown() and not icon("spell1"):IsShown(), "bloqueada otra vez: solo lo que está en cooldown")
+ns.db.activeX, ns.db.activeY = 0, 0
+M.Tick(0.2)
+
+-- Botón "Probar": todos los iconos un rato, sin destello ni sonido al terminar
+ns.db.activeSound.spell1 = true
+assert(ns.PreviewActiveBar(10), "hay algo que mostrar")
+assert(icon("spell1"):IsShown() and icon("spell1").cd._cooldown.duration == 10, "vista previa con su propio barrido")
+M.Tick(5); M.Tick(5.5)
+assert(not icon("spell1"):IsShown() and not ns.GetActiveFlash("spell1"):IsShown() and #played == 0,
+    "al terminar la vista previa: sin destello ni sonido")
+
+-- Sonido cuando un cooldown elegido está listo (tras más de un GCD)
+spells[1] = { active = true, gcd = false }
+update(); M.Tick(1); M.Tick(1)
+spells[1].active = false
+update()
+assert(#played == 1 and played[1] == 8960, "suena al estar listo")
+M.Tick(1.2)
+ns.db.activeSound.spell1 = nil
+
+-- Objetos: en cooldown se ven, con cuántos quedan
+ns.db.activeItems[5512] = true
+ns.RefreshActiveBar()
+itemCooldown.start, itemCooldown.duration = 95, 120
+update()
+local potion = icon("item5512")
+assert(potion:IsShown() and potion.cd._cooldown.duration == 120 and potion.icon._texture == 9512, "objeto en cooldown")
+assert(potion.count:IsShown() and potion.count:GetText() == 2, "con cuántos quedan")
+itemCooldown.start, itemCooldown.duration = 0, 0
+update(); M.Tick(1.2)
+assert(not potion:IsShown(), "objeto listo: oculto")
+ns.db.activeItems[5512] = nil
+ns.RefreshActiveBar()
 
 -- Modo de edición abierto: todo como Blizzard
 EditModeManagerFrame = { IsEditModeActive = function() return true end }
