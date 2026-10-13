@@ -19,10 +19,21 @@ local function OnRefresh(fn)
 end
 
 -- Aplica el estilo tras cambiar una opción
-local function Apply()
+local function ApplyStyle()
     ns.UpdateExpire()
     ns.SkinAll()
     ns.StyleActionBars()
+end
+
+-- Un error al aplicar no debe romper el control que lo llamó (por ejemplo, el selector de color de Blizzard
+-- no se cierra si su función falla): se avisa en el chat y el panel sigue funcionando
+local function SafeCall(fn, ...)
+    local ok, err = pcall(fn, ...)
+    if not ok then ns.ReportError(err) end
+end
+
+local function Apply()
+    SafeCall(ApplyStyle)
 end
 
 local function PlayClick(on)
@@ -57,9 +68,21 @@ local function FormatOrBlizzard(v)
     return ("%d"):format(v)
 end
 
+-- Al escribir un valor se usan las unidades que se ven: 8% de recorte se guarda como 0.08
+local DISPLAY_SCALE = { [FormatPercent] = 100 }
+
 ------------------------------------------------------------------------
 -- Listas de opciones de los desplegables
 ------------------------------------------------------------------------
+
+local function KeybindAnchorOptions()
+    return {
+        { value = "TOPLEFT", text = L["Top left"] },
+        { value = "TOPRIGHT", text = L["Top right"] },
+        { value = "BOTTOMLEFT", text = L["Bottom left"] },
+        { value = "BOTTOMRIGHT", text = L["Bottom right"] },
+    }
+end
 
 local function OutlineOptions()
     local list = {}
@@ -159,8 +182,8 @@ function Layout:Check(col, label, get, set, tip)
     cb.Text:SetJustifyH("LEFT")
     cb.Text:SetWordWrap(false)
     cb:SetHitRectInsets(0, -textWidth, 0, 0)
-    cb:SetScript("OnClick", function(self)
-        local on = self:GetChecked() and true or false
+    cb:SetScript("OnClick", function(button)
+        local on = button:GetChecked() and true or false
         PlayClick(on)
         set(on)
     end)
@@ -177,8 +200,7 @@ function Layout:DBCheck(col, label, key, tip, onChange)
         function() return ns.db[key] end,
         function(on)
             ns.db[key] = on
-            local fn = onChange or Apply
-            fn()
+            SafeCall(onChange or ApplyStyle)
         end, tip)
 end
 
@@ -189,9 +211,10 @@ function Layout:Slider(col, label, key, step, display, onChange, tip)
     title:SetPoint("TOPLEFT", x, y)
     title:SetText(label)
     local limits = ns.LIMITS[key]
+    local scale = DISPLAY_SCALE[display] or 1
     local s = CreateFrame("Slider", nil, self.content, "BackdropTemplate")
     s:SetOrientation("HORIZONTAL")
-    s:SetSize(self.colWidth - 70, 12)
+    s:SetSize(self.colWidth - 92, 12)
     s:SetPoint("TOPLEFT", x, y - 22)
     s:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
     s:SetBackdropColor(unpack(ns.COLORS.bg))
@@ -205,27 +228,79 @@ function Layout:Slider(col, label, key, step, display, onChange, tip)
     s:SetObeyStepOnDrag(true)
     s:EnableMouse(true)
 
-    local value = s:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    value:SetPoint("LEFT", s, "RIGHT", 10, 0)
+    -- Cuadro con el valor: se puede escribir el número exacto (Intro) o ajustarlo con la rueda del ratón
+    local box = CreateFrame("EditBox", nil, self.content, "BackdropTemplate")
+    box:SetSize(80, 20)
+    box:SetPoint("LEFT", s, "RIGHT", 8, 0)
+    box:SetAutoFocus(false)
+    box:SetFontObject("GameFontHighlightSmall")
+    box:SetJustifyH("CENTER")
+    box:SetTextInsets(3, 3, 0, 0)
+    box:SetMaxLetters(12)
+    box:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
+    box:SetBackdropColor(0, 0, 0, 0.35)
+    box:EnableMouseWheel(true)
+    local function boxBorder(alpha) box:SetBackdropBorderColor(PURPLE[1], PURPLE[2], PURPLE[3], alpha) end
+    boxBorder(0.25)
+
+    local function round(v)
+        v = math.max(limits[1], math.min(limits[2], v))
+        return tonumber(("%.3f"):format(math.floor(v / step + 0.5) * step))
+    end
+    local function showValue()
+        if box:HasFocus() then
+            box:SetText(("%g"):format(tonumber(("%.3f"):format(ns.db[key] * scale))))
+        else
+            box:SetText(display(ns.db[key]))
+        end
+    end
+    -- Cambia el valor como si se hubiera movido el deslizador (guarda y aplica el estilo)
+    local function setValue(v)
+        v = round(v)
+        if v ~= ns.db[key] then s:SetValue(v) end
+        showValue()
+    end
 
     local refreshing = false
     local function refresh()
         refreshing = true
         s:SetValue(ns.db[key])
-        value:SetText(display(ns.db[key]))
+        showValue()
         refreshing = false
     end
     s:SetScript("OnValueChanged", function(_, v)
         if refreshing then return end
-        v = tonumber(("%.3f"):format(math.floor(v / step + 0.5) * step))
-        ns.db[key] = v
-        value:SetText(display(v))
-        local fn = onChange or Apply
-        fn()
+        ns.db[key] = round(v)
+        showValue()
+        SafeCall(onChange or ApplyStyle)
     end)
+
+    box:SetScript("OnEditFocusGained", function()
+        boxBorder(0.9)
+        showValue()
+        box:HighlightText()
+    end)
+    box:SetScript("OnEditFocusLost", function()
+        boxBorder(0.25)
+        box:HighlightText(0, 0)
+        showValue()
+    end)
+    box:SetScript("OnEnterPressed", function()
+        -- Acepta coma o punto decimal y unidades escritas ("8%", "3,5 s")
+        local n = tonumber((box:GetText():gsub(",", ".")):match("%-?%d*%.?%d+"))
+        if n then setValue(n / scale) end
+        box:ClearFocus()
+    end)
+    box:SetScript("OnEscapePressed", function() box:ClearFocus() end)
+    box:SetScript("OnHide", function() box:ClearFocus() end)
+    box:SetScript("OnMouseWheel", function(_, delta) setValue(ns.db[key] + delta * step) end)
+    box:HookScript("OnEnter", function() if not box:HasFocus() then boxBorder(0.6) end end)
+    box:HookScript("OnLeave", function() if not box:HasFocus() then boxBorder(0.25) end end)
+
     refresh()
     OnRefresh(refresh)
     AddTooltip(s, label, tip)
+    AddTooltip(box, label, L["Type a value and press Enter, or use the mouse wheel over it."])
     return s
 end
 
@@ -252,8 +327,7 @@ function Layout:Color(col, label, key, onChange, tip)
         local c = ns.db[key]
         c[1], c[2], c[3], c[4] = r, g, bl, a
         refresh()
-        local fn = onChange or Apply
-        fn()
+        SafeCall(onChange or ApplyStyle)
     end
     b:SetScript("OnClick", function()
         local c = ns.db[key]
@@ -306,8 +380,7 @@ function Layout:DBChoice(col, label, key, getOptions, tip, onChange)
         function() return ns.db[key] end,
         function(value)
             ns.db[key] = value
-            local fn = onChange or Apply
-            fn()
+            SafeCall(onChange or ApplyStyle)
         end, tip)
 end
 
@@ -319,6 +392,37 @@ function Layout:Button(col, text, width, onClick, tip, xOffset)
     b:SetScript("OnClick", onClick)
     AddTooltip(b, text, tip)
     return b
+end
+
+-- Cuadro de texto con título: onEnter(texto) al pulsar Intro, onChange(texto) mientras se escribe
+function Layout:EditBox(col, label, onEnter, onChange, tip)
+    local x, y = self:X(col), self.y
+    local title = self.content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    title:SetPoint("TOPLEFT", x, y)
+    title:SetText(label)
+    local box = CreateFrame("EditBox", nil, self.content, "BackdropTemplate")
+    box:SetSize(self.colWidth - 20, 22)
+    box:SetPoint("TOPLEFT", x, y - 20)
+    box:SetAutoFocus(false)
+    box:SetFontObject("GameFontHighlightSmall")
+    box:SetTextInsets(6, 6, 0, 0)
+    box:SetMaxLetters(60)
+    box:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
+    box:SetBackdropColor(0, 0, 0, 0.35)
+    box:SetBackdropBorderColor(PURPLE[1], PURPLE[2], PURPLE[3], 0.4)
+    box:SetScript("OnEnterPressed", function()
+        if onEnter then SafeCall(onEnter, box:GetText()) end
+        box:ClearFocus()
+    end)
+    box:SetScript("OnEscapePressed", function() box:ClearFocus() end)
+    box:SetScript("OnHide", function() box:ClearFocus() end)
+    if onChange then
+        box:SetScript("OnTextChanged", function(_, userInput)
+            if userInput then SafeCall(onChange, box:GetText()) end
+        end)
+    end
+    AddTooltip(box, label, tip)
+    return box
 end
 
 -- Vista previa en vivo de los ajustes del perfil activo
@@ -345,7 +449,6 @@ local function BuildHeader(panel)
 
     local desc = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
-    desc:SetPoint("RIGHT", panel, "RIGHT", -180, 0)
     desc:SetJustifyH("LEFT")
     desc:SetTextColor(0.78, 0.78, 0.78)
     desc:SetText(L[panel.descKey])
@@ -354,16 +457,27 @@ local function BuildHeader(panel)
     chip:SetPoint("TOPRIGHT", -16, -12)
     OnRefresh(function() chip:SetText(L["Profile: %s"]:format("|cff9b4dff" .. ns.activeProfile .. "|r")) end)
 
+    -- Botones a la derecha: Valores por defecto (si la página tiene) y Recargar IU (en todas)
+    local rightEdge = -16
     if panel.resetKeys then
         local reset = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-        reset:SetSize(160, 22)
-        reset:SetPoint("TOPRIGHT", -16, -30)
+        reset:SetSize(150, 22)
+        reset:SetPoint("TOPRIGHT", rightEdge, -30)
         reset:SetText(L["Defaults"])
         reset:SetScript("OnClick", function()
             ns.ShowPopup("RUSCUUCDM_RESET_KEYS", L[panel.titleKey], nil, panel.resetKeys)
         end)
         AddTooltip(reset, L["Defaults"], L["Restores the default values of this page in the active profile."])
+        rightEdge = rightEdge - 150 - 6
     end
+    local reload = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    reload:SetSize(120, 22)
+    reload:SetPoint("TOPRIGHT", rightEdge, -30)
+    reload:SetText(L["Reload UI"])
+    reload:SetScript("OnClick", function() ReloadUI() end)
+    AddTooltip(reload, L["Reload UI"],
+        L["Reloads the game interface, like /reload. Most changes apply instantly; the language needs a reload."])
+    desc:SetPoint("RIGHT", panel, "RIGHT", rightEdge - 120 - 8, 0)
 
     local line = panel:CreateTexture(nil, "ARTWORK")
     line:SetColorTexture(PURPLE[1], PURPLE[2], PURPLE[3], 0.6)
@@ -389,6 +503,9 @@ end
 -- Las páginas se construyen la primera vez que se abren (el panel ya tiene su tamaño definitivo)
 local function CreatePage(titleKey, descKey, resetKeys, build)
     local panel = CreateFrame("Frame")
+    -- Oculto desde el principio: si no, el primer Show() de la ventana de opciones no dispara OnShow
+    -- (el marco ya estaba visible) y la página sale en blanco hasta salir y volver a entrar
+    panel:Hide()
     panel.OnCommit = function() end
     panel.OnDefault = function() end
     panel.OnRefresh = function() end
@@ -400,7 +517,14 @@ local function CreatePage(titleKey, descKey, resetKeys, build)
             local content, width = BuildScroll(self)
             local ui = NewLayout(content, width)
             self.content, self.ui = content, ui
-            build(ui, self)
+            -- Si algo falla al construir la página se avisa en ella en vez de dejarla en blanco
+            local ok, err = pcall(build, ui, self)
+            if not ok then
+                local _, h = ui:Note("|cffff5555" .. L["This page could not be shown because of an error. Please report it:"]
+                    .. "|r\n" .. tostring(err))
+                ui:Next(h)
+                geterrorhandler()(err)
+            end
             content:SetHeight(-ui.y + 24)
         end
         ns.RefreshOptions()
@@ -442,10 +566,11 @@ local function BuildGeneral(ui)
             line(s.actionCooldowns > 0, L["Action bar cooldowns hooked: %d"]:format(s.actionCooldowns)),
             line(s.curveAPI, L["Golden border: curve API %s, buttons %d, cooldowns read %d"]:format(
                 s.curveAPI and L["yes"] or L["no"], s.expireTracked, s.expireReads)),
+            line(s.auraAPI, L["Buffs about to end: aura API %s"]:format(s.auraAPI and L["yes"] or L["no"])),
             "|cffffffff" .. L["Active profile: %s"]:format(ns.activeProfile) .. "|r",
         }, "\n"))
     end)
-    ui:Next(84)
+    ui:Next(100)
 
     ui:Section(L["Addon"])
     ui:Check(1, L["Show minimap button"],
@@ -463,11 +588,9 @@ local function BuildGeneral(ui)
     ui:Next(32)
     ui:Dropdown(1, L["Language"],
         function()
-            return {
-                { value = "auto", text = L["Automatic (game language)"] },
-                { value = "en", text = "English" },
-                { value = "es", text = "Español" },
-            }
+            local list = { { value = "auto", text = L["Automatic (game language)"] } }
+            for _, lang in ipairs(ns.LANGUAGES) do list[#list + 1] = { value = lang.code, text = lang.name } end
+            return list
         end,
         function() return ns.global.language end,
         function(value)
@@ -475,7 +598,6 @@ local function BuildGeneral(ui)
             ns.Print(L["The language will change when you reload the interface."], true)
         end,
         L["The addon follows the game language by default. Changing it requires reloading the interface."])
-    ui:Button(2, L["Reload interface"], 200, function() ReloadUI() end, nil)
     ui:Next(56)
 
     ui:Section(L["Commands"])
@@ -514,6 +636,13 @@ local function BuildCooldownManager(ui)
         if col == 2 then ui:Next(30) end
     end
 
+    ui:Section(L["Active cooldowns"])
+    ui:DBCheck(1, L["Only active cooldowns"], "activeOnly",
+        L["The global cooldown doesn't count. While Edit Mode or Blizzard's cooldown settings are open, everything is shown as usual."])
+    ui:Button(2, L["Choose spells and size"], 220, function() ns.OpenOptions("active") end,
+        L["Opens the Active cooldowns page: which spells appear in the bar, icon size, spacing and buffs."])
+    ui:Next(34)
+
     ui:Section(L["Icons"])
     ui:DBCheck(1, L["Square icons"], "squareIcons",
         L["Removes Blizzard's round mask and frame so icons are square."])
@@ -545,6 +674,9 @@ local function BuildCooldownManager(ui)
     ui:Color(1, L["Bar color"], "barColor")
     ui:Color(2, L["Bar background"], "bgColor")
     ui:Next(32)
+    ui:DBCheck(1, L["Class color bars"], "barClassColor",
+        L["Uses your class color for the buff bars instead of the chosen bar color."])
+    ui:Next(32)
 end
 
 ------------------------------------------------------------------------
@@ -575,6 +707,17 @@ local function BuildTexts(ui)
     ui:DBCheck(1, L["Custom color"], "countUseColor")
     ui:Color(2, L["Charges color"], "countColor")
     ui:Next(32)
+
+    ui:Section(L["Keybinds"])
+    ui:DBCheck(1, L["Show keybinds"], "showKeybinds",
+        L["Shows on each Cooldown Manager icon the key that casts it, taken from your action bars."])
+    ui:Color(2, L["Keybind color"], "keybindColor")
+    ui:Next(32)
+    ui:Slider(1, L["Keybind size"], "keybindSize", 1, FormatNumber)
+    ui:DBChoice(2, L["Outline"], "keybindOutline", OutlineOptions)
+    ui:Next(56)
+    ui:DBChoice(1, L["Position"], "keybindAnchor", KeybindAnchorOptions)
+    ui:Next(56)
 
     ui:Section(L["Buff bar texts"])
     ui:Slider(1, L["Name and duration size"], "barTextSize", 1, FormatOrBlizzard, nil, L["0 keeps Blizzard's size."])
@@ -620,7 +763,7 @@ local function BuildActionBars(ui)
             function(on)
                 ns.db.bars[bar.key] = on
                 Apply()
-            end)
+            end, bar.tipKey and L[bar.tipKey])
         if col == 2 then ui:Next(28) end
     end
     if #ns.ACTION_BARS % 2 == 1 then ui:Next(28) end
@@ -663,11 +806,61 @@ local function BuildGoldenBorder(ui)
     ui:Slider(2, L["Minimum opacity"], "expirePulseMin", 0.05, FormatPercent,
         nil, L["How much the border fades between blinks."])
     ui:Next(48)
+
+    ui:Section(L["Buffs about to end"])
+    ui:DBCheck(1, L["Border when a buff is about to end"], "buffEndGlow",
+        L["On the Cooldown Manager's buff icons and bars, so you know when to refresh them. Uses the thickness, glow and blinking above."])
+    ui:Color(2, L["Buff border color"], "buffEndColor")
+    ui:Next(32)
+    ui:Slider(1, L["Last seconds of the buff"], "buffEndSeconds", 0.5, FormatSeconds, nil,
+        L["The border appears when this many seconds (or fewer) of the buff remain."])
+    ui:Next(48)
 end
 
 ------------------------------------------------------------------------
 -- Página Borde dorado: hechizos
 ------------------------------------------------------------------------
+
+local function SpellName(spellID)
+    local ok, name = pcall(C_Spell.GetSpellName, spellID)
+    return ok and type(name) == "string" and name or ("#" .. spellID)
+end
+
+local function SpellIcon(spellID)
+    local ok, icon = pcall(C_Spell.GetSpellTexture, spellID)
+    return ok and icon or nil
+end
+
+-- Casilla de un hechizo con su icono y su nombre; onClick(row, marcada)
+local function NewSpellRow(ui, onClick)
+    local row = CreateFrame("CheckButton", nil, ui.content, "UICheckButtonTemplate")
+    row:SetSize(24, 24)
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(20, 20)
+    row.icon:SetPoint("LEFT", row, "RIGHT", 2, 0)
+    row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    row.Text:ClearAllPoints()
+    row.Text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+    row.Text:SetFontObject("GameFontHighlight")
+    row.Text:SetWidth(ui.colWidth - 60)
+    row.Text:SetJustifyH("LEFT")
+    row.Text:SetWordWrap(false)
+    row:SetHitRectInsets(0, -(ui.colWidth - 30), 0, 0)
+    row:SetScript("OnClick", function(self)
+        local on = self:GetChecked() and true or false
+        PlayClick(on)
+        SafeCall(onClick, self, on)
+    end)
+    return row
+end
+
+local function ShowSpellRow(row, sp, checked)
+    row.spellID = sp.spellID
+    row.icon:SetTexture(sp.icon or 134400)
+    row.Text:SetText(sp.name)
+    row:SetChecked(checked)
+    row:Show()
+end
 
 local function BuildSpells(ui, panel)
     local _, h = ui:Note(L["Uncheck the spells that should never get the golden border. The list shows the spells on your action bars and in the Cooldown Manager; the choice is saved in the active profile."])
@@ -691,11 +884,7 @@ local function BuildSpells(ui, panel)
         for spellID, on in pairs(ns.db.expireExclude) do
             if on and not seen[spellID] then
                 seen[spellID] = true
-                spells[#spells + 1] = {
-                    spellID = spellID,
-                    name = C_Spell.GetSpellName(spellID) or ("#" .. spellID),
-                    icon = C_Spell.GetSpellTexture(spellID),
-                }
+                spells[#spells + 1] = { spellID = spellID, name = SpellName(spellID), icon = SpellIcon(spellID) }
             end
         end
         table.sort(spells, function(a, b) return a.name < b.name end)
@@ -703,22 +892,7 @@ local function BuildSpells(ui, panel)
         for i, sp in ipairs(spells) do
             local row = rows[i]
             if not row then
-                row = CreateFrame("CheckButton", nil, ui.content, "UICheckButtonTemplate")
-                row:SetSize(24, 24)
-                row.icon = row:CreateTexture(nil, "ARTWORK")
-                row.icon:SetSize(20, 20)
-                row.icon:SetPoint("LEFT", row, "RIGHT", 2, 0)
-                row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-                row.Text:ClearAllPoints()
-                row.Text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-                row.Text:SetFontObject("GameFontHighlight")
-                row.Text:SetWidth(ui.colWidth - 60)
-                row.Text:SetJustifyH("LEFT")
-                row.Text:SetWordWrap(false)
-                row:SetHitRectInsets(0, -(ui.colWidth - 30), 0, 0)
-                row:SetScript("OnClick", function(self)
-                    local on = self:GetChecked() and true or false
-                    PlayClick(on)
+                row = NewSpellRow(ui, function(self, on)
                     ns.db.expireExclude[self.spellID] = (not on) or nil
                 end)
                 rows[i] = row
@@ -727,11 +901,7 @@ local function BuildSpells(ui, panel)
             local line = math.floor((i - 1) / 2)
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", ui:X(col) - 4, listTop - line * 28)
-            row.spellID = sp.spellID
-            row.icon:SetTexture(sp.icon or 134400)
-            row.Text:SetText(sp.name)
-            row:SetChecked(not ns.db.expireExclude[sp.spellID])
-            row:Show()
+            ShowSpellRow(row, sp, not ns.db.expireExclude[sp.spellID])
         end
         for i = #spells + 1, #rows do rows[i]:Hide() end
         local listHeight = math.ceil(#spells / 2) * 28
@@ -747,6 +917,166 @@ local function BuildSpells(ui, panel)
     ui:Next(36)
     listTop = ui.y
     panel.emptyNote = ui:Note(L["No spells found. Put spells on your action bars or enable the Cooldown Manager, then press \"Refresh list\"."])
+    panel.onShow = Rebuild
+    OnRefresh(function() if panel:IsVisible() then Rebuild() end end)
+end
+
+------------------------------------------------------------------------
+-- Página Cooldowns activos: la barra y sus hechizos
+------------------------------------------------------------------------
+
+-- Un hechizo con rangos está elegido si lo está cualquiera de ellos
+local function AnyRankChosen(ranks)
+    for _, id in ipairs(ranks) do
+        if ns.IsActiveSpellChosen(id) then return true end
+    end
+    return false
+end
+
+local function BuildActive(ui, panel)
+    local _, h = ui:Note(L["A bar of your own with only the cooldowns that are running, in one line centered where the essential cooldowns are, and the active buffs next to them. Blizzard's essential and utility icons are hidden while it is on; everything goes back to normal while Edit Mode or Blizzard's cooldown settings are open."])
+    ui:Next(h)
+    ui:DBCheck(1, L["Only active cooldowns"], "activeOnly",
+        L["The global cooldown doesn't count. Spells with charges show while a charge is recharging."])
+    ui:DBCheck(2, L["Flash when ready"], "activeFlash",
+        L["When a cooldown ends, its icon stays one second with a flash before hiding."])
+    ui:Next(30)
+    ui:DBCheck(1, L["Buffs in the same line"], "activeBuffs",
+        L["The active buffs of the Cooldown Manager (icons) go after the cooldowns, at the same size."])
+    ui:Next(32)
+    ui:Slider(1, L["Icon size"], "activeSize", 1, FormatPixels)
+    ui:Slider(2, L["Spacing"], "activeSpacing", 1, FormatPixels)
+    ui:Next(48)
+
+    ui:Section(L["Spells in the bar"])
+    _, h = ui:Note(L["Check the spells that can appear in the bar: any spell of your spellbook, or any other by its ID or name. The choice is saved in the active profile."])
+    ui:Next(h)
+    local rows, headers = {}, {}
+    local filter = ""
+    local listTop, emptyNote
+
+    local function Rebuild()
+        local seen = {}
+        local cdm = { title = L["Cooldown Manager"], spells = {} }
+        local book = { title = L["Spellbook"], spells = {} }
+        local added = { title = L["Added by ID or name"], spells = {} }
+        for _, id in ipairs(ns.GetCDMSpellIDs()) do
+            if not seen[id] then
+                seen[id] = true
+                cdm.spells[#cdm.spells + 1] = { spellID = id, name = SpellName(id), icon = SpellIcon(id) }
+            end
+        end
+        for _, sp in ipairs(ns.GetSpellbookSpells()) do
+            local known = false
+            for _, id in ipairs(sp.ranks or { sp.spellID }) do
+                if seen[id] then known = true end
+            end
+            if not known then
+                for _, id in ipairs(sp.ranks or { sp.spellID }) do seen[id] = true end
+                book.spells[#book.spells + 1] = sp
+            end
+        end
+        for id, on in pairs(ns.db.activeAdd) do
+            if on and type(id) == "number" and not seen[id] then
+                seen[id] = true
+                added.spells[#added.spells + 1] = { spellID = id, name = SpellName(id), icon = SpellIcon(id) }
+            end
+        end
+        local function byName(a, b)
+            if a.name ~= b.name then return a.name < b.name end
+            return a.spellID < b.spellID
+        end
+        table.sort(book.spells, byName)
+        table.sort(added.spells, byName)
+
+        local needle = strtrim(filter):lower()
+        local function matches(sp)
+            return needle == "" or sp.name:lower():find(needle, 1, true) ~= nil or tostring(sp.spellID) == needle
+        end
+
+        local y, rowCount, headerCount = listTop, 0, 0
+        for _, g in ipairs({ cdm, book, added }) do
+            local list = {}
+            for _, sp in ipairs(g.spells) do
+                if matches(sp) then list[#list + 1] = sp end
+            end
+            if #list > 0 then
+                headerCount = headerCount + 1
+                local header = headers[headerCount]
+                if not header then
+                    header = ui.content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+                    headers[headerCount] = header
+                end
+                header:ClearAllPoints()
+                header:SetPoint("TOPLEFT", 16, y)
+                header:SetText(("%s (%d)"):format(g.title, #list))
+                header:Show()
+                y = y - 24
+                for i, sp in ipairs(list) do
+                    rowCount = rowCount + 1
+                    local row = rows[rowCount]
+                    if not row then
+                        row = NewSpellRow(ui, function(self, on)
+                            if on then
+                                ns.SetActiveSpellChosen(self.spellID, true)
+                            else
+                                -- Se quitan todos los rangos del hechizo
+                                for _, id in ipairs(self.ranks) do ns.SetActiveSpellChosen(id, false) end
+                            end
+                            self:SetChecked(AnyRankChosen(self.ranks))
+                            ns.RefreshActiveBar()
+                        end)
+                        rows[rowCount] = row
+                    end
+                    local col = (i % 2 == 1) and 1 or 2
+                    row:ClearAllPoints()
+                    row:SetPoint("TOPLEFT", ui:X(col) - 4, y - math.floor((i - 1) / 2) * 28)
+                    row.ranks = sp.ranks or { sp.spellID }
+                    ShowSpellRow(row, sp, AnyRankChosen(row.ranks))
+                end
+                y = y - math.ceil(#list / 2) * 28 - 8
+            end
+        end
+        for i = rowCount + 1, #rows do rows[i]:Hide() end
+        for i = headerCount + 1, #headers do headers[i]:Hide() end
+        emptyNote:SetShown(rowCount == 0)
+        if rowCount == 0 then y = y - 30 end
+        ui.content:SetHeight(-y + 24)
+    end
+
+    ui:DBCheck(1, L["Cooldown Manager spells"], "activeCDM",
+        L["Includes the essential and utility spells you chose in Blizzard's Cooldown Manager. Uncheck one in the list to leave it out."],
+        function()
+            ApplyStyle()
+            Rebuild()
+        end)
+    ui:Next(30)
+    for i in ipairs(ns.TRINKET_SLOTS) do
+        ui:DBCheck(i, ns.TrinketLabel(i), "activeTrinket" .. i,
+            L["Shows the trinket while its use effect is on cooldown."])
+    end
+    ui:Next(32)
+    ui:EditBox(1, L["Search"], nil, function(text)
+        filter = text
+        Rebuild()
+    end, L["Shows only the spells whose name contains this text."])
+    local addBox
+    addBox = ui:EditBox(2, L["Add a spell by ID or name"], function(text)
+        local id = ns.FindSpell(text)
+        if not id then
+            ns.Print(L["Spell not found: %s"]:format(strtrim(text or "")), true)
+            return
+        end
+        ns.SetActiveSpellChosen(id, true)
+        addBox:SetText("")
+        ns.RefreshActiveBar()
+        Rebuild()
+        ns.Print(L["Added to the active cooldowns bar: %s"]:format(SpellName(id)), true)
+    end, nil, L["Type a spell ID (for example 642) or the exact name of a spell and press Enter."])
+    ui:Next(54)
+    listTop = ui.y
+    emptyNote = ui:Note(L["No spells found. Enable the Cooldown Manager or type a spell above."])
+    emptyNote:Hide()
     panel.onShow = Rebuild
     OnRefresh(function() if panel:IsVisible() then Rebuild() end end)
 end
@@ -1002,13 +1332,20 @@ local SUBPAGES = {
         key = "cdm", titleKey = "Cooldown Manager", descKey = "Icons, borders, swipe and buff bars.",
         build = BuildCooldownManager,
         resetKeys = { "enabled", "squareIcons", "iconZoom", "borderSize", "borderColor", "borderClassColor",
-            "showSwipe", "swipeColor", "cooldownEdge", "cooldownBling", "barTexture", "barColor", "bgColor" },
+            "showSwipe", "swipeColor", "cooldownEdge", "cooldownBling", "barTexture", "barColor", "barClassColor", "bgColor" },
     },
     {
-        key = "texts", titleKey = "Texts and numbers", descKey = "Font, countdown numbers, charges and bar texts.",
+        key = "active", titleKey = "Active cooldowns", descKey = "Only the cooldowns that are running, in one centered bar.",
+        build = BuildActive,
+        resetKeys = { "activeOnly", "activeFlash", "activeBuffs", "activeSize", "activeSpacing", "activeCDM",
+            "activeAdd", "activeRemove", "activeTrinket1", "activeTrinket2" },
+    },
+    {
+        key = "texts", titleKey = "Texts and numbers", descKey = "Font, countdown numbers, charges, keybinds and bar texts.",
         build = BuildTexts,
         resetKeys = { "font", "showNumbers", "fontSize", "numberOutline", "numberColor", "countSize",
-            "countOutline", "countUseColor", "countColor", "barTextSize" },
+            "countOutline", "countUseColor", "countColor", "showKeybinds", "keybindSize", "keybindOutline",
+            "keybindColor", "keybindAnchor", "barTextSize" },
     },
     {
         key = "actionbars", titleKey = "Action bars", descKey = "Cooldown numbers on your action buttons.",
@@ -1020,7 +1357,8 @@ local SUBPAGES = {
         key = "golden", titleKey = "Golden border", descKey = "A pulsing border during the last seconds of a cooldown.",
         build = BuildGoldenBorder,
         resetKeys = { "expireGlow", "expireOnCDM", "expireOnActionBars", "expireSeconds", "expireColor",
-            "expireThickness", "expireGlowShow", "expireGlowSize", "expirePulse", "expirePulseSpeed", "expirePulseMin" },
+            "expireThickness", "expireGlowShow", "expireGlowSize", "expirePulse", "expirePulseSpeed", "expirePulseMin",
+            "buffEndGlow", "buffEndColor", "buffEndSeconds" },
     },
     {
         key = "spells", titleKey = "Golden border: spells", descKey = "Choose which spells get the golden border.",

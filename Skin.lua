@@ -82,6 +82,15 @@ function ns.BorderColor(db)
     return c[1], c[2], c[3], c[4] or 1
 end
 
+function ns.BarColor(db)
+    if db.barClassColor then
+        local r, g, b = ns.ClassColor()
+        return r, g, b, db.barColor[4] or 1
+    end
+    local c = db.barColor
+    return c[1], c[2], c[3], c[4] or 1
+end
+
 function ns.MakeBorder(parent, anchor)
     local border = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     border.anchor = anchor
@@ -260,8 +269,7 @@ local function SkinBar(item, d, db)
         local t = bar:GetStatusBarTexture()
         if t then t:SetAtlas(BLIZZ_BAR_ATLAS) end
     end
-    local c = db.barColor
-    bar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
+    bar:SetStatusBarColor(ns.BarColor(db))
     if bar.BarBG then bar.BarBG:SetAlpha(0) end
     if not d.barBg then
         d.barBg = bar:CreateTexture(nil, "BACKGROUND", nil, -8)
@@ -315,23 +323,74 @@ local function UnskinItem(item)
 end
 
 ------------------------------------------------------------------------
+-- Atajo de teclado sobre los iconos de cooldowns (la tecla la busca ActionBars.lua)
+------------------------------------------------------------------------
+
+local KEYBIND_OFFSETS = { TOPLEFT = { 2, -2 }, TOPRIGHT = { -2, -2 }, BOTTOMLEFT = { 2, 2 }, BOTTOMRIGHT = { -2, 2 } }
+
+function ns.StyleKeybindText(fs, anchorTo, db)
+    ns.SetFontSafe(fs, db.font, db.keybindSize, ns.OutlineFlags(db.keybindOutline))
+    local c = db.keybindColor
+    fs:SetTextColor(c[1], c[2], c[3], c[4] or 1)
+    local anchor = KEYBIND_OFFSETS[db.keybindAnchor] and db.keybindAnchor or "TOPRIGHT"
+    local offset = KEYBIND_OFFSETS[anchor]
+    fs:ClearAllPoints()
+    fs:SetPoint(anchor, anchorTo, anchor, offset[1], offset[2])
+end
+
+-- Tecla del hechizo del icono; si el juego oculta el hechizo (en combate) se conserva la última
+local function ItemHotkey(item, d)
+    local base = item.GetBaseSpellID and item:GetBaseSpellID()
+    local spell = item.GetSpellID and item:GetSpellID()
+    if ns.IsSecret(base) or ns.IsSecret(spell) then return d.keyText end
+    if not ns.GetSpellHotkey then return end
+    return ns.GetSpellHotkey(base) or ns.GetSpellHotkey(spell)
+end
+
+local function LayoutKeybind(item, show)
+    local d = decor[item]
+    if not show then
+        if d and d.keyFrame then d.keyFrame:Hide() end
+        return
+    end
+    local tex = IconTexture(item)
+    if not tex then return end
+    if not d then
+        d = {}
+        decor[item] = d
+    end
+    if not d.keyFrame then
+        -- Frame propio por encima del barrido y del borde dorado
+        d.keyFrame = CreateFrame("Frame", nil, item)
+        d.keyLabel = d.keyFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    end
+    local f = d.keyFrame
+    f:ClearAllPoints()
+    f:SetAllPoints(tex)
+    f:SetFrameLevel(item:GetFrameLevel() + 7)
+    ns.StyleKeybindText(d.keyLabel, f, ns.db)
+    d.keyText = ItemHotkey(item, d)
+    d.keyLabel:SetText(d.keyText or "")
+    f:SetShown(d.keyText ~= nil)
+end
+
+------------------------------------------------------------------------
 -- Borde dorado cuando al cooldown le quedan pocos segundos.
 -- El addon no puede leer el tiempo restante (es un valor secreto en combate): pide al juego el
 -- DurationObject del cooldown y una curva de color decide el color; el addon nunca ve el tiempo.
 ------------------------------------------------------------------------
 
-local expireCurve
-local tracked = {}        -- owner -> { tex, getDuration, border, inner, edges, glow, errors }
+local expireCurve        -- cooldowns: borde dorado
+local buffCurve          -- buffs a punto de terminar
+local tracked = {}        -- owner -> { tex, getDuration, kind, border, inner, edges, glow, errors }
 local trackedCount = 0
 local reads = 0
 local testUntil = 0
 local testing = false
 
--- Transparente con 0 s (habilidad lista), del color elegido hasta N s, transparente a partir de ahí
-function ns.RebuildExpireCurve()
-    expireCurve = nil
+-- Transparente con 0 s (habilidad lista o sin buff), del color elegido hasta N s, transparente a partir de ahí
+local function BuildCurve(c, s)
     if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return end
-    local c, s = ns.db.expireColor, ns.db.expireSeconds
     local a = c[4] or 1
     local ok, curve = pcall(function()
         local cv = C_CurveUtil.CreateColorCurve()
@@ -342,7 +401,24 @@ function ns.RebuildExpireCurve()
         cv:AddPoint(86400, CreateColor(c[1], c[2], c[3], 0))
         return cv
     end)
-    if ok then expireCurve = curve end
+    if ok then return curve end
+end
+
+function ns.RebuildExpireCurve()
+    expireCurve = BuildCurve(ns.db.expireColor, ns.db.expireSeconds)
+    buffCurve = BuildCurve(ns.db.buffEndColor, ns.db.buffEndSeconds)
+end
+
+-- Curva de un borde, o nil si su tipo de aviso está desactivado
+local function EntryCurve(entry, db)
+    if entry.kind == "buff" then
+        return db.buffEndGlow and buffCurve
+    end
+    return db.expireGlow and expireCurve
+end
+
+local function EntryColor(entry, db)
+    return entry.kind == "buff" and db.buffEndColor or db.expireColor
 end
 
 local function SetExpireColor(entry, r, g, b, a)
@@ -385,7 +461,8 @@ local function LayoutExpire(entry, owner)
     right:SetPoint("TOPRIGHT"); right:SetPoint("BOTTOMRIGHT"); right:SetWidth(s)
 
     -- El brillo de Blizzard mide 62 px para un botón de 36: sobresale un 36% del icono por lado
-    local size = entry.tex:GetWidth()
+    -- Se usa el lado corto: en las barras de buffs el borde puede rodear la barra entera
+    local size = math.min(entry.tex:GetWidth() or 0, entry.tex:GetHeight() or 0)
     if not size or size <= 0 then size = 36 end
     local glow = math.floor(size * 0.36 * db.expireGlowSize / 100 + 0.5)
     entry.glow:ClearAllPoints()
@@ -394,18 +471,43 @@ local function LayoutExpire(entry, owner)
     entry.glow:SetShown(db.expireGlowShow and glow > 0)
 end
 
+-- ¿El cooldown de este hechizo es solo el tiempo de reutilización global? El juego nunca oculta este dato
+-- (isOnGCD), ni en combate. Sin él, el GCD encendería el borde en todos los botones al lanzar algo.
+function ns.SpellOnGCD(spellID)
+    if not spellID or ns.IsSecret(spellID) or not (C_Spell and C_Spell.GetSpellCooldown) then return false end
+    local info = C_Spell.GetSpellCooldown(spellID)
+    return info ~= nil and info.isOnGCD == true
+end
+
+-- El dato isOnGCD solo es fiable al recibir el aviso de cambio de cooldowns: se guarda en ese momento
+local function CheckGCD(entry)
+    if not entry.isOnGCD then return false end
+    local ok, onGCD = pcall(entry.isOnGCD)
+    return ok and onGCD == true
+end
+
 -- Registra un frame (icono del Cooldown Manager o botón de acción) para el borde dorado.
 -- getDuration devuelve el DurationObject de su cooldown, o nil si no tiene o está excluido.
-function ns.TrackExpire(owner, tex, getDuration)
+-- kind = "buff" para los buffs a punto de terminar (otra curva y otro color).
+-- isOnGCD (opcional) dice si su cooldown es solo el tiempo de reutilización global: entonces no hay borde.
+function ns.TrackExpire(owner, tex, getDuration, kind, isOnGCD)
     local entry = tracked[owner]
     if not entry then
         entry = { errors = 0 }
         tracked[owner] = entry
         trackedCount = trackedCount + 1
     end
-    entry.tex, entry.getDuration = tex, getDuration
+    entry.tex, entry.getDuration, entry.kind, entry.isOnGCD = tex, getDuration, kind, isOnGCD
+    entry.gcd = CheckGCD(entry)
     LayoutExpire(entry, owner)
 end
+
+local gcdEvents = CreateFrame("Frame")
+gcdEvents:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+gcdEvents:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN")
+gcdEvents:SetScript("OnEvent", function()
+    for _, entry in pairs(tracked) do entry.gcd = CheckGCD(entry) end
+end)
 
 function ns.UntrackExpire(owner)
     local entry = tracked[owner]
@@ -429,14 +531,18 @@ function ns.ExpireAllowed(spellID)
     return true
 end
 
-local function UpdateEntry(entry)
+local function UpdateEntry(entry, curve)
+    if entry.gcd then
+        entry.border:Hide()
+        return
+    end
     local duration = entry.getDuration()
     if not duration then
         entry.border:Hide()
         return
     end
     reads = reads + 1
-    local color = duration:EvaluateRemainingDuration(expireCurve)
+    local color = duration:EvaluateRemainingDuration(curve)
     SetExpireColor(entry, color:GetRGBA())
     entry.border:Show()
 end
@@ -466,11 +572,11 @@ driver:SetScript("OnUpdate", function(_, elapsed)
     local now = GetTime()
 
     if now < testUntil then
-        -- Vista previa: todos los bordes visibles con el color elegido
+        -- Vista previa: todos los bordes visibles con el color elegido (dorado o el de los buffs)
         testing = true
-        local c = db.expireColor
         for owner, entry in pairs(tracked) do
             if OwnerVisible(owner) then
+                local c = EntryColor(entry, db)
                 SetExpireColor(entry, c[1], c[2], c[3], c[4] or 1)
                 entry.border:Show()
             else
@@ -486,18 +592,17 @@ driver:SetScript("OnUpdate", function(_, elapsed)
         sinceEval = sinceEval + elapsed
         if sinceEval >= 0.1 then
             sinceEval = 0
-            if db.expireGlow and expireCurve then
-                for owner, entry in pairs(tracked) do
-                    if not entry.disabled and OwnerVisible(owner) then
-                        if not pcall(UpdateEntry, entry) then
-                            -- Un fallo aislado no apaga la función; un frame que falla siempre se ignora
-                            entry.errors = entry.errors + 1
-                            entry.border:Hide()
-                            if entry.errors >= 5 then entry.disabled = true end
-                        end
-                    else
+            for owner, entry in pairs(tracked) do
+                local curve = EntryCurve(entry, db)
+                if curve and not entry.disabled and OwnerVisible(owner) then
+                    if not pcall(UpdateEntry, entry, curve) then
+                        -- Un fallo aislado no apaga la función; un frame que falla siempre se ignora
+                        entry.errors = entry.errors + 1
                         entry.border:Hide()
+                        if entry.errors >= 5 then entry.disabled = true end
                     end
+                else
+                    entry.border:Hide()
                 end
             end
         end
@@ -511,12 +616,31 @@ end)
 
 -- Cooldown de un icono del Cooldown Manager (ignorando el cooldown global).
 -- Se usa el hechizo base: el hechizo "actual" puede ser un aura secreta en combate.
-local function ViewerItemDuration(item)
+local function ViewerItemSpell(item)
     local spellID = item.GetBaseSpellID and item:GetBaseSpellID()
     if not spellID and item.GetSpellID then spellID = item:GetSpellID() end
     if not spellID or ns.IsSecret(spellID) then return end
-    if not ns.ExpireAllowed(spellID) then return end
+    return spellID
+end
+ns.ViewerItemSpell = ViewerItemSpell
+
+local function ViewerItemDuration(item)
+    local spellID = ViewerItemSpell(item)
+    if not spellID or not ns.ExpireAllowed(spellID) then return end
     return C_Spell.GetSpellCooldownDuration(spellID, true)
+end
+
+-- Duración del buff (o debuff en el objetivo) que muestra un icono o una barra de buffs.
+-- Se pide al juego por su identificador de aura; si el juego lo oculta (secreto) no hay aviso.
+local function ViewerItemAuraDuration(item)
+    if not (C_UnitAuras and C_UnitAuras.GetAuraDuration) then return end
+    local id = item.GetAuraSpellInstanceID and item:GetAuraSpellInstanceID()
+    if ns.IsSecret(id) or not id then return end
+    local unit = item.GetAuraDataUnit and item:GetAuraDataUnit() or "player"
+    if ns.IsSecret(unit) then return end
+    -- El aura puede haber terminado justo ahora: no cuenta como error
+    local ok, duration = pcall(C_UnitAuras.GetAuraDuration, unit, id)
+    if ok then return duration end
 end
 
 -- Se llama al cambiar las opciones del borde dorado (y al cambiar de perfil)
@@ -526,7 +650,7 @@ function ns.UpdateExpire()
         entry.errors, entry.disabled = 0, nil -- cualquier cambio vuelve a intentarlo
         LayoutExpire(entry, owner)
     end
-    if not ns.db.expireGlow then HideAllExpire() end
+    if not ns.db.expireGlow and not ns.db.buffEndGlow then HideAllExpire() end
 end
 
 function ns.TestExpire(seconds)
@@ -537,6 +661,7 @@ end
 function ns.CountExpireTracked() return trackedCount end
 function ns.CountExpireReads() return reads end
 function ns.IsExpireBroken() return not (C_CurveUtil and C_CurveUtil.CreateColorCurve) end
+function ns.HasAuraDurationAPI() return (C_UnitAuras and C_UnitAuras.GetAuraDuration) ~= nil end
 
 ------------------------------------------------------------------------
 -- Visores
@@ -555,6 +680,8 @@ end
 function ns.CountViewerItems(viewer)
     return #ItemFrames(viewer)
 end
+
+ns.GetViewerItems = ItemFrames
 
 -- Hechizos de los cooldowns visibles en el Cooldown Manager (para la lista del borde dorado)
 function ns.GetViewerSpells()
@@ -585,13 +712,34 @@ function ns.SkinViewer(entry)
     local on = db.enabled[entry.key]
     for _, item in ipairs(ItemFrames(viewer)) do
         if on then SkinItem(item, db) else UnskinItem(item) end
+        if entry.cooldowns then LayoutKeybind(item, on and db.showKeybinds) end
         local tex = IconTexture(item)
         if entry.cooldowns and on and db.expireOnCDM and tex then
-            ns.TrackExpire(item, tex, function() return ViewerItemDuration(item) end)
+            ns.TrackExpire(item, tex, function() return ViewerItemDuration(item) end, nil,
+                function() return ns.SpellOnGCD(ViewerItemSpell(item)) end)
+        elseif not entry.cooldowns and on and db.buffEndGlow and tex then
+            -- En las barras con el icono oculto el borde rodea la barra
+            local holder = IconHolder(item)
+            local anchor = (holder ~= item and not holder:IsShown() and item.Bar) or tex
+            ns.TrackExpire(item, anchor, function() return ViewerItemAuraDuration(item) end, "buff")
         else
             ns.UntrackExpire(item)
         end
     end
+end
+
+-- Se llama cuando cambian las teclas o lo que hay en las barras
+function ns.RefreshKeybinds()
+    local db = ns.db
+    if not db then return end
+    for _, entry in ipairs(ns.VIEWERS) do
+        local viewer = entry.cooldowns and _G[entry.frame]
+        if viewer then
+            local show = db.enabled[entry.key] and db.showKeybinds
+            for _, item in ipairs(ItemFrames(viewer)) do LayoutKeybind(item, show) end
+        end
+    end
+    if ns.RefreshActiveKeybinds then ns.RefreshActiveKeybinds() end
 end
 
 function ns.SkinAll()
@@ -600,6 +748,7 @@ function ns.SkinAll()
     for _, entry in ipairs(ns.VIEWERS) do
         ns.SkinViewer(entry)
     end
+    if ns.RefreshActiveBar then ns.RefreshActiveBar() end
     if ns.RefreshPreviews then ns.RefreshPreviews() end
 end
 
@@ -637,6 +786,7 @@ function ns.HookViewers()
                 end
             end
             viewer:HookScript("OnShow", queue)
+            if ns.HookActiveViewer then ns.HookActiveViewer(viewer) end
             queue()
         end
     end
@@ -658,9 +808,9 @@ end
 
 local previews = {}
 local PREVIEW_ICONS = {
-    { icon = "Interface\\Icons\\Spell_Frost_FrostNova", duration = 12, count = "2" },
-    { icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", duration = 30 },
-    { icon = "Interface\\Icons\\Ability_Warrior_Charge" },
+    { icon = "Interface\\Icons\\Spell_Frost_FrostNova", duration = 12, count = "2", key = "1" },
+    { icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", duration = 30, key = "Q" },
+    { icon = "Interface\\Icons\\Ability_Warrior_Charge", key = "s-E" },
 }
 
 -- Muestra cómo quedan los iconos, la barra, los números y el borde dorado con los ajustes actuales
@@ -700,6 +850,13 @@ function ns.CreatePreview(parent)
             -- El borde dorado de la vista previa usa el mismo sistema que los botones reales
             ns.TrackExpire(holder, tex, function() return holder.durationObject end)
         end
+        local keyFrame = CreateFrame("Frame", nil, holder)
+        keyFrame:SetAllPoints(tex)
+        keyFrame:SetFrameLevel(holder:GetFrameLevel() + 7)
+        holder.keyFrame = keyFrame
+        -- Con fuente desde el principio: escribir en un texto sin fuente da error y deja la página en blanco
+        holder.key = keyFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        holder.key:SetText(info.key)
         if info.count then
             holder.count = holder:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
             holder.count:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -762,11 +919,13 @@ function ns.RefreshPreview(p)
         if holder.count then
             ns.StyleText(holder.count, db.countSize, db.countOutline, db.countUseColor and db.countColor or nil)
         end
+        ns.StyleKeybindText(holder.key, holder.keyFrame, db)
+        holder.keyFrame:SetShown(db.showKeybinds)
     end
     local bar = p.bar
     bar:SetStatusBarTexture(ns.ResolveBarTexture(db.barTexture) or WHITE)
-    local c, bg = db.barColor, db.bgColor
-    bar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
+    local bg = db.bgColor
+    bar:SetStatusBarColor(ns.BarColor(db))
     bar.bg:SetColorTexture(bg[1], bg[2], bg[3], bg[4] or 1)
     ns.LayoutBorder(bar.border, db.borderSize, r, g, b, a)
     ns.StyleText(bar.name, db.barTextSize, db.countOutline, nil)

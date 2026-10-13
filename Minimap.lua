@@ -27,13 +27,48 @@ local function OnClick(mouseButton)
     end
 end
 
+local OFFSET = 10 -- distancia del centro del botón al borde del minimapa
+local OPPOSITE = { TOPLEFT = "BOTTOMRIGHT", TOPRIGHT = "BOTTOMLEFT", BOTTOMLEFT = "TOPRIGHT", BOTTOMRIGHT = "TOPLEFT" }
+
+-- Forma del minimapa: los addons que lo cambian (Leatrix Plus, SexyMap...) definen GetMinimapShape
+local function MinimapShape()
+    if not GetMinimapShape then return "ROUND" end
+    local ok, shape = pcall(GetMinimapShape)
+    return (ok and type(shape) == "string") and shape or "ROUND"
+end
+
+-- ¿Es redonda esa esquina del minimapa? Formas: ROUND, SQUARE, CORNER-*, SIDE-*, TRICORNER-*
+local function IsRoundCorner(shape, corner)
+    if shape == "SQUARE" then return false end
+    local kind, where = shape:match("^(%u+)%-(%u+)$")
+    if kind == "CORNER" then return where == corner end
+    if kind == "SIDE" then return corner:find(where, 1, true) ~= nil end
+    if kind == "TRICORNER" then return OPPOSITE[where] ~= corner end
+    return true
+end
+
+-- Posición del botón respecto al centro del minimapa para un ángulo (en grados)
+function ns.MinimapButtonOffset(angleDegrees, shape, width, height)
+    local angle = math.rad(angleDegrees)
+    local x, y = math.cos(angle), math.sin(angle)
+    local corner = (y >= 0 and "TOP" or "BOTTOM") .. (x >= 0 and "RIGHT" or "LEFT")
+    local w, h = width / 2 + OFFSET, height / 2 + OFFSET
+    if IsRoundCorner(shape, corner) then
+        return x * w, y * h
+    end
+    -- Esquina recta: el botón sigue el borde del cuadrado en vez del círculo
+    local m = math.max(math.abs(x), math.abs(y))
+    return x / m * w, y / m * h
+end
+
 -- Coloca el botón en el borde del minimapa según el ángulo guardado
 local function UpdatePosition()
-    local angle = math.rad(ns.global.minimap.angle)
-    local radius = Minimap:GetWidth() / 2 + 10
+    if not button then return end
+    local x, y = ns.MinimapButtonOffset(ns.global.minimap.angle, MinimapShape(), Minimap:GetWidth(), Minimap:GetHeight())
     button:ClearAllPoints()
-    button:SetPoint("CENTER", Minimap, "CENTER", math.cos(angle) * radius, math.sin(angle) * radius)
+    button:SetPoint("CENTER", Minimap, "CENTER", x, y)
 end
+ns.UpdateMinimapPosition = UpdatePosition
 
 local function OnDragUpdate()
     local mx, my = Minimap:GetCenter()
@@ -88,6 +123,8 @@ function ns.CreateMinimapButton()
 
     UpdatePosition()
     button:SetShown(not ns.global.minimap.hide)
+    -- Los addons de minimapa pueden cambiar su tamaño o su forma después de cargar este addon
+    Minimap:HookScript("OnSizeChanged", UpdatePosition)
 end
 
 function ns.SetMinimapShown(shown)

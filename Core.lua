@@ -124,6 +124,8 @@ ns.ACTION_BARS = {
     { key = "bar7", prefix = "MultiBar7Button", nameKey = "Action bar 8" },
     { key = "pet", prefix = "PetActionButton", nameKey = "Pet bar", noActionSlot = true },
     { key = "stance", prefix = "StanceButton", nameKey = "Stance bar", noActionSlot = true },
+    -- Botones de Bartender4, Dominos, ElvUI y otros addons de barras (se buscan aparte, sin prefijo fijo)
+    { key = "addons", nameKey = "Bars from other addons", tipKey = "Bartender4, Dominos, ElvUI and other action bar addons." },
 }
 
 -- Valores por defecto de cada perfil de estilo (cada clave es una opción del panel)
@@ -144,9 +146,22 @@ ns.PROFILE_DEFAULTS = {
     cooldownEdge = "blizzard",                -- línea brillante del barrido: blizzard | show | hide
     cooldownBling = "blizzard",               -- destello al terminar: blizzard | show | hide
 
+    -- Barra de solo cooldowns activos, en una línea centrada donde está la barra de esenciales
+    activeOnly = false,
+    activeFlash = true,                       -- al terminar, el icono se queda un segundo con un destello
+    activeBuffs = true,                       -- los buffs activos del Cooldown Manager van en la misma línea
+    activeSize = 40,                          -- tamaño de los iconos de la barra
+    activeSpacing = 4,                        -- separación entre iconos
+    activeCDM = true,                         -- incluir los hechizos de esenciales y utilidad
+    activeAdd = {},                           -- [spellID] = true: hechizos añadidos a la barra
+    activeRemove = {},                        -- [spellID] = true: hechizos del Cooldown Manager quitados
+    activeTrinket1 = false,                   -- abalorio de arriba (hueco 13)
+    activeTrinket2 = false,                   -- abalorio de abajo (hueco 14)
+
     -- Barras de buffs
     barTexture = "flat",
     barColor = { 0.55, 0.25, 0.95, 1 },
+    barClassColor = false,                    -- usar el color de la clase en vez del color de barra elegido
     bgColor = { 0.07, 0.03, 0.12, 0.85 },
 
     -- Textos
@@ -161,6 +176,13 @@ ns.PROFILE_DEFAULTS = {
     countColor = { 1, 1, 1, 1 },
     barTextSize = 0,                          -- nombre y duración de las barras; 0 = tamaño de Blizzard
 
+    -- Atajos de teclado sobre los iconos de cooldowns
+    showKeybinds = true,
+    keybindSize = 12,
+    keybindOutline = "OUTLINE",
+    keybindColor = { 0.95, 0.91, 0.84, 1 },
+    keybindAnchor = "TOPRIGHT",               -- esquina del icono: TOPLEFT | TOPRIGHT | BOTTOMLEFT | BOTTOMRIGHT
+
     -- Números de las barras de acción
     styleActionBarNumbers = true,
     actionBarFontSize = 16,
@@ -168,7 +190,7 @@ ns.PROFILE_DEFAULTS = {
     actionBarNumberColor = { 0.95, 0.91, 0.84, 1 },
     bars = {
         main = true, bottomLeft = true, bottomRight = true, right = true, left = true,
-        bar5 = true, bar6 = true, bar7 = true, pet = true, stance = true,
+        bar5 = true, bar6 = true, bar7 = true, pet = true, stance = true, addons = true,
     },
 
     -- Borde dorado cuando un cooldown está terminando
@@ -184,6 +206,12 @@ ns.PROFILE_DEFAULTS = {
     expirePulseSpeed = 1.2,                   -- parpadeos por segundo
     expirePulseMin = 0.25,                    -- transparencia mínima del parpadeo
     expireExclude = {},                       -- [spellID] = true: hechizos sin borde dorado
+
+    -- Borde en los buffs del Cooldown Manager cuando están a punto de terminar
+    -- (usa el grosor, el resplandor y el parpadeo del borde dorado)
+    buffEndGlow = false,
+    buffEndSeconds = 5,
+    buffEndColor = { 1, 0.40, 0.10, 1 },
 }
 
 -- Rangos válidos (los usan las opciones y la importación)
@@ -193,12 +221,16 @@ ns.LIMITS = {
     fontSize = { 6, 40 },
     countSize = { 0, 32 },
     barTextSize = { 0, 24 },
+    keybindSize = { 6, 24 },
     actionBarFontSize = { 6, 40 },
     expireSeconds = { 0.5, 30 },
     expireThickness = { 1, 8 },
     expireGlowSize = { 0, 200 },
     expirePulseSpeed = { 0.2, 5 },
     expirePulseMin = { 0, 0.9 },
+    buffEndSeconds = { 1, 60 },
+    activeSize = { 20, 80 },
+    activeSpacing = { 0, 20 },
 }
 
 -- Valores permitidos para las opciones de lista (los usa la importación)
@@ -208,6 +240,8 @@ ns.CHOICES = {
     numberOutline = { NONE = true, OUTLINE = true, THICKOUTLINE = true, MONOCHROME = true },
     countOutline = { NONE = true, OUTLINE = true, THICKOUTLINE = true, MONOCHROME = true },
     actionBarNumberOutline = { NONE = true, OUTLINE = true, THICKOUTLINE = true, MONOCHROME = true },
+    keybindOutline = { NONE = true, OUTLINE = true, THICKOUTLINE = true, MONOCHROME = true },
+    keybindAnchor = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true },
     expirePulse = { none = true, pulse = true, flash = true },
 }
 
@@ -252,6 +286,17 @@ end
 function ns.Print(msg, important)
     if not important and ns.global and ns.global.chatMessages == false then return end
     print("|cff9b4dffRuscuu CDM|r: " .. msg)
+end
+
+-- Errores del addon: se escriben en el chat (una vez cada uno) aunque el juego oculte los errores de Lua,
+-- para que el jugador pueda copiarlos, y se pasan al gestor de errores del juego (BugSack, scriptErrors)
+local reportedErrors = {}
+function ns.ReportError(err)
+    local message = tostring(err)
+    if reportedErrors[message] then return end
+    reportedErrors[message] = true
+    ns.Print(L["Something went wrong: %s"]:format(message), true)
+    geterrorhandler()(err)
 end
 
 function ns.IsSecret(value)
@@ -461,13 +506,18 @@ events:SetScript("OnEvent", function(_, event, arg1)
         ns.HookActionBars()
         ns.HookViewers()
         ns.RefreshAll()
+        -- Para entonces los addons de minimapa ya decidieron su forma (cuadrada, redonda...)
+        ns.UpdateMinimapPosition()
     elseif event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED"
         or (event == "PLAYER_SPECIALIZATION_CHANGED" and arg1 == "player") then
         ns.SelectProfileForSpec()
         C_Timer.After(1, ns.SkinAll)
     elseif event == "PLAYER_ENTERING_WORLD" then
-        -- Al cambiar de zona Blizzard rehace los iconos
-        C_Timer.After(1, ns.SkinAll)
+        -- Al cambiar de zona Blizzard rehace los iconos; los addons de barras pueden crear botones tarde
+        C_Timer.After(1, function()
+            ns.SkinAll()
+            ns.HookActionBars()
+        end)
     end
 end)
 
@@ -549,6 +599,9 @@ function ns.GetStatus()
         expireTracked = ns.CountExpireTracked(),
         expireReads = ns.CountExpireReads(),
         expireBroken = ns.IsExpireBroken(),
+        auraAPI = ns.HasAuraDurationAPI(),
+        activeAPI = ns.ActiveCooldownAPI(),
+        activeEntries = ns.CountActiveEntries(),
     }
 end
 
@@ -565,5 +618,8 @@ function ns.Debug()
     ns.Print(L["Golden border: curve API %s, buttons %d, cooldowns read %d"]:format(
         s.curveAPI and yes or no, s.expireTracked, s.expireReads)
         .. (s.expireBroken and " |cffff5555(" .. L["disabled"] .. ")|r" or ""), true)
+    ns.Print(L["Buffs about to end: aura API %s"]:format(s.auraAPI and yes or no), true)
+    ns.Print(L["Active cooldowns: cooldown state %s"]:format(s.activeAPI == nil and "?" or (s.activeAPI and yes or no))
+        .. " · " .. L["%d in the bar"]:format(s.activeEntries), true)
     ns.Print(L["Active profile: %s"]:format(ns.activeProfile), true)
 end

@@ -3,6 +3,10 @@
 ## Notes: Ruscuu visual style for Blizzard's Cooldown Manager: themes, per-spec profiles and cooldown numbers.
 ## Notes-esES: Estilo visual Ruscuu para el Cooldown Manager de Blizzard: temas, perfiles por especialización y números de cooldown.
 ## Notes-esMX: Estilo visual Ruscuu para el Cooldown Manager de Blizzard: temas, perfiles por especialización y números de cooldown.
+## Notes-deDE: Ruscuu-Stil für den Cooldown Manager von Blizzard: Designs, Profile je Spezialisierung und Abklingzeit-Zahlen.
+## Notes-frFR: Style Ruscuu pour le Cooldown Manager de Blizzard : thèmes, profils par spécialisation et compte à rebours.
+## Notes-ptBR: Estilo visual Ruscuu para o Cooldown Manager da Blizzard: temas, perfis por especialização e números de recarga.
+## Notes-ruRU: Стиль Ruscuu для Cooldown Manager от Blizzard: темы, профили для специализаций и цифры восстановления.
 ## Author: Ruscuu
 ## Version: @project-version@
 ## IconTexture: Interface\AddOns\RuscuuCDM\Media\icon
@@ -14,9 +18,15 @@
 ## AddonCompartmentFuncOnLeave: RuscuuCDM_OnAddonCompartmentLeave
 
 Locales.lua
+Locales\esES.lua
+Locales\deDE.lua
+Locales\frFR.lua
+Locales\ptBR.lua
+Locales\ruRU.lua
 Core.lua
 Profiles.lua
 Skin.lua
+ActiveCooldowns.lua
 Minimap.lua
 ActionBars.lua
 Options.lua

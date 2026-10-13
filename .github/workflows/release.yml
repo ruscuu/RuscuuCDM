@@ -23,6 +23,6 @@ jobs:
       - name: Comprobar sintaxis Lua
         run: |
           sudo apt-get install -y luajit
-          for f in *.lua; do luajit -bl "$f" > /dev/null; done
+          for f in $(git ls-files '*.lua'); do luajit -bl "$f" > /dev/null; done
 
       - uses: BigWigsMods/packager@v2

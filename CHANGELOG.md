@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.5.0
+
+**New**
+- **Active cooldowns bar**: a bar of the addon's own that shows only the cooldowns that are running, in one line centered where the essential cooldowns are, with the active buffs of the Cooldown Manager next to them. Blizzard's essential and utility icons are hidden while it is on (off by default).
+  - **Choose any spell**: the Cooldown Manager's spells come checked; uncheck any of them or add any spell of your spellbook (pet spells and flyouts too), any other spell by its ID or name, and your trinkets. New "Active cooldowns" options page with a search box.
+  - **Icon size and spacing** of your own, and the buffs are resized to match.
+  - Spells with charges show while a charge is recharging, with the number of charges. The global cooldown doesn't count, and when a cooldown ends its icon stays one second with a flash.
+  - Spells with several ranks show once in the list, and their icon shows whichever rank you cast.
+  - Keybinds, golden border, swipe, numbers and borders follow your style. Everything goes back to normal while Edit Mode or Blizzard's cooldown settings are open.
+- **Keybinds on Cooldown Manager icons**: each cooldown shows the key that casts it, taken from your action bars (also from form, stance and stealth bars). Customizable size, color, outline and corner. On by default.
+- **Border when a buff is about to end**, on the Cooldown Manager's buff icons and bars, with its own color and seconds (off by default). Like the golden border, the game decides when it shows: the addon never reads the remaining time.
+- **Bartender4, Dominos and ElvUI**: their action buttons get the styled numbers, the golden border and keybinds too (new "Bars from other addons" checkbox).
+- **Class color bars** option for the buff bars (the Class color theme turns it on).
+- **Type exact values** in the sliders, or use the mouse wheel over the value.
+- **Square minimaps** (Leatrix Plus, SexyMap…): the minimap button follows the square edge.
+- **New languages**: German, French, Portuguese and Russian.
+- **Reload UI** button on every options page.
+
+**Fixed**
+- The first time you opened an options page after logging in or `/reload`, it was blank until you went to another page and came back.
+- The global cooldown no longer lights up the golden border on every button when you cast a spell.
+- The color picker could stay open after Accept or Cancel. Now it always closes, and if something fails the error is shown in the chat.
+
 ## v0.4.0
 
 **New**
