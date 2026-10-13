@@ -1,10 +1,18 @@
-# Empaqueta el addon y lo publica en CurseForge, Wago y GitHub Releases al crear un tag (por ejemplo v0.3.0).
+# Empaqueta el addon y lo publica en CurseForge, Wago y GitHub Releases.
+# Se lanza al subir un tag (por ejemplo v0.5.0) o a mano desde Actions > Release > Run workflow,
+# escribiendo la versión: entonces el propio workflow crea el tag sobre main y publica.
 name: Release
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión a publicar (por ejemplo v0.5.0)"
+        required: true
+        type: string
 
 jobs:
   release:
@@ -19,6 +27,26 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # Lanzado a mano: crea el tag de la versión sobre el commit actual y lo sube.
+      # (Un tag subido con GITHUB_TOKEN no vuelve a lanzar este workflow, así que no se publica dos veces.)
+      - name: Crear el tag de la versión
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Versión no válida: '$VERSION' (usa el formato v1.2.3)"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/$VERSION" > /dev/null; then
+            echo "::error::El tag $VERSION ya existe"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "$VERSION"
+          git push origin "$VERSION"
 
       - name: Comprobar sintaxis Lua
         run: |
