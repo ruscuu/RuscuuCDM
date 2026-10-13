@@ -317,6 +317,12 @@ local function GetCharges(id)
     return pcall(C_Spell.GetSpellCharges, id)
 end
 
+local function GetChargeDuration(id)
+    local slot = petSlots[id]
+    if slot then return pcall(C_SpellBook.GetSpellBookItemChargeDuration, slot, Enum.SpellBookSpellBank.Pet) end
+    return pcall(C_Spell.GetSpellChargeDuration, id)
+end
+
 local function GetCooldownDuration(id)
     local slot = petSlots[id]
     if slot then
@@ -480,7 +486,7 @@ function ns.ActiveIconDuration(f)
     if kind == "slot" then return f.slotDuration end
     local ok, d
     if kind == "charge" then
-        ok, d = pcall(C_Spell.GetSpellChargeDuration, f.spellID)
+        ok, d = GetChargeDuration(f.spellID)
     else
         ok, d = GetCooldownDuration(f.spellID)
     end
@@ -494,7 +500,7 @@ local function ApplySpellCooldown(f, db, active, empty, recharging, isCharge)
     if active then
         local ok, d
         if recharging then
-            ok, d = pcall(C_Spell.GetSpellChargeDuration, id)
+            ok, d = GetChargeDuration(id)
         else
             ok, d = GetCooldownDuration(id)
         end
