@@ -713,10 +713,27 @@ local function BuffActive(item, viewer)
     return s.active == true
 end
 
+-- Todos los rangos de cada hechizo elegido (en Forever cada rango es otro hechizo con el mismo nombre):
+-- el icono sale en cooldown se lance el rango que se lance
+local function AttachRanks(list)
+    local byID, byName = {}, {}
+    local ok, book = pcall(ns.GetSpellbookSpells)
+    for _, sp in ipairs(ok and book or {}) do
+        for _, id in ipairs(sp.ranks or { sp.spellID }) do byID[id] = sp.ranks end
+        byName[sp.name] = sp.ranks
+    end
+    for _, entry in ipairs(list) do
+        if entry.spell then
+            entry.ranks = byID[entry.spell] or byName[SpellName(entry.spell)] or { entry.spell }
+        end
+    end
+end
+
 local function RebuildEntries()
     RebuildPetSlots()
     ReadCDMSpells()
     entries = BuildEntries()
+    AttachRanks(entries)
     local used = {}
     for _, entry in ipairs(entries) do
         local f = GetIcon(entry)
@@ -773,13 +790,26 @@ local function Update()
         local f = icons[entry.key]
         local active, a, b, c
         if entry.spell then
+            -- El rango que esté en cooldown (o el elegido, si ninguno lo está)
             local id = Resolve(entry.spell)
+            active, a, b, c = SpellState(id)
+            if active ~= true then
+                for _, rank in ipairs(entry.ranks or {}) do
+                    local rid = Resolve(rank)
+                    if rid ~= id then
+                        local ra, r1, r2, r3 = SpellState(rid)
+                        if ra == true then
+                            id, active, a, b, c = rid, ra, r1, r2, r3
+                            break
+                        end
+                    end
+                end
+            end
             if id ~= f.spellID then
                 f.spellID = id
                 textures = true
                 f.style = nil
             end
-            active, a, b, c = SpellState(id)
         else
             active, a, b = SlotState(entry.slot)
         end
@@ -863,18 +893,18 @@ end)
 
 -- isOnGCD solo es fiable al recibir el aviso de cambio de cooldowns: se anota en ese momento
 local function CaptureGCD()
+    local ids = {}
     for _, entry in ipairs(entries) do
-        local f = icons[entry.key]
-        local id = entry.spell and f and f.spellID
-        if id then
-            local ok, info = GetCooldown(id)
-            local active = ok and type(info) == "table" and PlainBool(info.isActive) and info.isActive
-            onGCD[id] = ok and type(info) == "table" and PlainBool(info.isOnGCD) and info.isOnGCD or false
-            if not active then
-                latched[id] = nil
-            elseif not onGCD[id] then
-                latched[id] = true
-            end
+        for _, rank in ipairs(entry.ranks or { entry.spell }) do ids[#ids + 1] = Resolve(rank) end
+    end
+    for _, id in ipairs(ids) do
+        local ok, info = GetCooldown(id)
+        local active = ok and type(info) == "table" and PlainBool(info.isActive) and info.isActive
+        onGCD[id] = ok and type(info) == "table" and PlainBool(info.isOnGCD) and info.isOnGCD or false
+        if not active then
+            latched[id] = nil
+        elseif not onGCD[id] then
+            latched[id] = true
         end
     end
 end

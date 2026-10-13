@@ -50,7 +50,8 @@ end
 local known = { [100] = true, [200] = true, [210] = true, [300] = true, [642] = true }
 C_Spell.GetSpellName = function(id) if known[id] or id == 400 then return "S" .. id end end
 C_Spell.GetSpellInfo = function(name) if name == "Escudo divino" then return { spellID = 642 } end end
-C_Spell.GetSpellCooldown = function(id) if known[id] then return { isActive = false, isOnGCD = false } end end
+local onCooldown = {}
+C_Spell.GetSpellCooldown = function(id) if known[id] then return { isActive = onCooldown[id] == true, isOnGCD = false } end end
 
 -- Lista del libro: sin pasivos ni otras especializaciones, con los del menú desplegable aprendidos y la mascota
 local list = {}
@@ -141,6 +142,17 @@ M.Tick(0.2)
 local pet = ns.GetActiveIcon("spell400")
 assert(pet and pet:IsShown() and pet.cd._cooldown.duration.pet, "el cooldown de la mascota se ve en la barra")
 assert(not ns.GetActiveIcon("spell100"), "el quitado no tiene icono")
+
+-- Da igual el rango: elegido Golpe (rango más alto, 210), sale en cooldown al lanzar el rango 1 (200)
+onCooldown[200] = true
+M.FireEvent("SPELL_UPDATE_COOLDOWN")
+M.Tick(0.2)
+local golpe = ns.GetActiveIcon("spell210")
+assert(golpe and golpe:IsShown(), "el icono sale con cualquier rango en cooldown")
+onCooldown[200] = nil
+M.FireEvent("SPELL_UPDATE_COOLDOWN")
+M.Tick(1.5)
+assert(not golpe:IsShown(), "y se va cuando termina")
 
 -- Valores por defecto de la página: vuelve todo como al principio
 ns.ResetKeys(page.resetKeys)
