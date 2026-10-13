@@ -159,6 +159,25 @@ ns.db.expireExclude[2] = nil
 ns.RefreshActiveBar(); M.Tick(0.2)
 assert(M.ExpireBorder(f2), "el borde vuelve al incluirlo")
 
+-- Al lanzar algo, todos los hechizos pasan un instante a "en cooldown" (el GCD) antes del aviso del juego:
+-- no deben salir, ni con el aviso (isOnGCD), ni despedirse con destello al terminar el GCD
+spells[5] = { active = true, gcd = false }
+M.Tick(0.2)
+assert(not icon("spell5"):IsShown(), "antes del aviso del juego no sale ningún hechizo nuevo")
+spells[5].gcd = true
+update()
+assert(not icon("spell5"):IsShown(), "con el aviso: es el GCD, no sale")
+spells[5] = { active = false, gcd = false }
+update()
+assert(not icon("spell5"):IsShown() and not ns.GetActiveFlash("spell5"):IsShown(), "sin destello al terminar el GCD")
+-- Un cooldown real muy corto (menos que un GCD) sale, pero se va sin destello
+spells[5] = { active = true, gcd = false }
+update()
+assert(icon("spell5"):IsShown(), "un cooldown real confirmado sale")
+spells[5].active = false
+update()
+assert(not icon("spell5"):IsShown() and not ns.GetActiveFlash("spell5"):IsShown(), "corto: se va sin destello")
+
 -- A un cooldown real le queda menos que un GCD que empieza: el juego lo marca como GCD, pero no se oculta
 spells[4].gcd = true
 update()
@@ -174,7 +193,8 @@ assert(icon("spell2"):GetWidth() == 50, "iconos de 50")
 ns.db.activeSize, ns.db.activeSpacing = 40, 4
 ns.RefreshActiveBar()
 
--- Termina el cooldown de e2: un segundo visible con destello y después se va
+-- Termina el cooldown de e2 (tras más de un GCD visible): un segundo visible con destello y después se va
+M.Tick(1); M.Tick(1)
 spells[2].active = false
 update()
 assert(icon("spell2"):IsShown(), "al terminar se queda visible un momento")

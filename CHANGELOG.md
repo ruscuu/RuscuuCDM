@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.2
+
+**Fixed**
+- Active cooldowns bar: when casting a spell with nothing on cooldown, every spell could pop up for a moment (the global cooldown) and then disappear with a flash. Now a spell only appears once the game confirms its cooldown is real, and short cooldowns leave without a flash.
+
 ## v0.5.1
 
 **New**
