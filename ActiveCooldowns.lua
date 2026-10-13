@@ -300,7 +300,10 @@ end
 
 local function ItemName(itemID)
     local ok, name = pcall(ItemAPI("GetItemNameByID"), itemID)
-    return ok and type(name) == "string" and name or ("#" .. itemID)
+    if ok and type(name) == "string" then return name end
+    -- Aún no está en la caché del juego: se pide, y GET_ITEM_INFO_RECEIVED avisa cuando llega
+    pcall(ItemAPI("RequestLoadItemDataByID"), itemID)
+    return "#" .. itemID
 end
 ns.ActiveItemName = ItemName
 
@@ -756,6 +759,9 @@ local function SaveDraggedPosition()
     if ns.RefreshOptions then ns.RefreshOptions() end
 end
 
+-- Al cambiar de ancla, la barra se queda donde está: se recalcula su desplazamiento desde la nueva ancla
+ns.SaveActivePosition = SaveDraggedPosition
+
 bar:SetScript("OnDragStart", function(self)
     if ns.activeUnlocked then self:StartMoving() end
 end)
@@ -777,9 +783,7 @@ local function Compact(item, on)
             s.barMouse = item:IsMouseMotionEnabled() == true
             if barFrame then barFrame:SetAlpha(0) end
             if duration and item.Icon then
-                s.durParent = duration:GetParent()
-                s.durPoints = {}
-                for i = 1, duration:GetNumPoints() do s.durPoints[i] = { duration:GetPoint(i) } end
+                s.durMoved = true
                 duration:SetParent(item.Icon)
                 duration:ClearAllPoints()
                 duration:SetPoint("CENTER", item.Icon, "CENTER", 0, 0)
@@ -790,10 +794,13 @@ local function Compact(item, on)
     elseif s.compact then
         s.compact = nil
         if barFrame then barFrame:SetAlpha(1) end
-        if duration and s.durParent then
-            duration:SetParent(s.durParent)
+        if duration and s.durMoved then
+            -- Su sitio de la plantilla de Blizzard (CooldownViewer.xml). No se leen sus anclas: con el tiempo
+            -- secreto en combate también lo serían, y devolverlas daría error.
+            s.durMoved = nil
+            duration:SetParent(barFrame)
             duration:ClearAllPoints()
-            for _, point in ipairs(s.durPoints or {}) do duration:SetPoint(unpack(point)) end
+            duration:SetPoint("RIGHT", barFrame, "RIGHT", -8, 0)
         end
         item:SetMouseMotionEnabled(s.barMouse == true)
     end
@@ -1002,6 +1009,11 @@ local function Update()
         -- La barra no se ve ahora (por ejemplo, fuera de combate): los buffs vuelven a su sitio
         for _, item in ipairs(ViewerItems(buffViewer)) do RestoreBuff(item) end
         for _, item in ipairs(ViewerItems(barViewer)) do RestoreBuff(item) end
+        -- Lo que termine sin verse no se anuncia al volver (ni destello ni sonido de algo que acabó hace rato)
+        for _, f in pairs(icons) do
+            f.wasActive, f.lingerUntil = nil, nil
+            f.flash:Hide()
+        end
         bar:Hide()
         lastLine = nil
         return
@@ -1190,7 +1202,8 @@ local COOLDOWN_EVENTS = { SPELL_UPDATE_COOLDOWN = true, SPELL_UPDATE_CHARGES = t
     PLAYER_ENTERING_WORLD = true, PLAYER_REGEN_DISABLED = true, PLAYER_REGEN_ENABLED = true,
     PLAYER_MOUNT_DISPLAY_CHANGED = true, PLAYER_UPDATE_RESTING = true }
 local LIST_EVENTS = { SPELLS_CHANGED = true, PLAYER_EQUIPMENT_CHANGED = true, PLAYER_SPECIALIZATION_CHANGED = true,
-    PLAYER_TALENT_UPDATE = true, TRAIT_CONFIG_UPDATED = true, UNIT_PET = true, PET_BAR_UPDATE = true }
+    PLAYER_TALENT_UPDATE = true, TRAIT_CONFIG_UPDATED = true, UNIT_PET = true, PET_BAR_UPDATE = true,
+    GET_ITEM_INFO_RECEIVED = true }
 for event in pairs(COOLDOWN_EVENTS) do pcall(events.RegisterEvent, events, event) end
 for event in pairs(LIST_EVENTS) do
     if event == "UNIT_PET" then
@@ -1199,7 +1212,7 @@ for event in pairs(LIST_EVENTS) do
         pcall(events.RegisterEvent, events, event)
     end
 end
-events:SetScript("OnEvent", function(_, event)
+events:SetScript("OnEvent", function(_, event, itemID)
     if LIST_EVENTS[event] then
         entriesDirty = true
     elseif event == "SPELL_UPDATE_ICON" then
@@ -1207,8 +1220,18 @@ events:SetScript("OnEvent", function(_, event)
     else
         cooldownsDirty = true
     end
-    if not (ns.db and ns.db.activeOnly) then return end
+    -- Se anota siempre, aunque la barra esté desactivada: así, al activarla, los cooldowns ya en marcha salen
     if event == "SPELL_UPDATE_COOLDOWN" or event == "PLAYER_ENTERING_WORLD" then pcall(CaptureGCD) end
+    -- Al entrar en combate la barra deja de estar desbloqueada (la vista previa taparía los cooldowns reales)
+    if event == "PLAYER_REGEN_DISABLED" and ns.activeUnlocked then
+        ns.SetActiveUnlocked(false)
+        if ns.RefreshOptions then ns.RefreshOptions() end
+    end
+    if event == "GET_ITEM_INFO_RECEIVED" then
+        if not (ns.db and ns.db.activeItems[itemID]) then return end
+        if ns.RefreshOptions then ns.RefreshOptions() end -- el nombre del objeto ya está
+    end
+    if not (ns.db and ns.db.activeOnly) then return end
     SafeUpdate()
 end)
 
@@ -1235,6 +1258,10 @@ function ns.HookActiveViewer(viewer)
         lastLine = nil
         SafeUpdate()
     end)
+    -- Blizzard cambia qué hechizo muestra cada icono sin recolocarlos si su número no cambia
+    if not isBuffs and type(viewer.RefreshData) == "function" then
+        hooksecurefunc(viewer, "RefreshData", function() entriesDirty = true end)
+    end
 end
 
 -- Se llama al cambiar las opciones (y al cambiar de perfil): estilo, tamaño y lista de hechizos
@@ -1328,8 +1355,18 @@ function ns.MoveActiveEntry(key, delta)
     local target = index and index + delta
     if not target or target < 1 or target > #list then return false end
     list[index], list[target] = list[target], list[index]
-    local order = {}
-    for i, e in ipairs(list) do order[i] = e.key end
+    local order, present = {}, {}
+    for i, e in ipairs(list) do
+        order[i] = e.key
+        present[e.key] = true
+    end
+    -- Lo que ahora no está en la barra (un abalorio desmarcado, hechizos de otra especialización) conserva su sitio
+    for _, saved in ipairs(ns.db.activeOrder) do
+        if type(saved) == "string" and not present[saved] then
+            order[#order + 1] = saved
+            present[saved] = true
+        end
+    end
     ns.db.activeOrder = order
     ns.RefreshActiveBar()
     return true

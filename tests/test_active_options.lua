@@ -203,17 +203,23 @@ assert(keys() == "spell210 spell400 item5512 spell642", "subir: " .. keys())
 orderRows()[1].down:Fire("OnClick")
 assert(keys() == "spell400 spell210 item5512 spell642", "bajar: " .. keys())
 assert(ns.db.activeOrder[1] == "spell400", "el orden se guarda en el perfil")
+-- Mover no pierde el sitio de lo que ahora no está en la barra
+table.insert(ns.db.activeOrder, 2, "slot13")
+ns.MoveActiveEntry("spell642", -1)
+local savedOrder = table.concat(ns.db.activeOrder, " ")
+assert(savedOrder:find("slot13"), "el abalorio desmarcado conserva su sitio: " .. savedOrder)
 ns.RefreshActiveBar()
 assert(ns.CountActiveEntries() == 4, "la barra tiene los cuatro")
 local r1 = orderRows()[1]
 r1.sound:SetChecked(true); r1.sound:Fire("OnClick")
 assert(ns.db.activeSound.spell400, "sonido marcado")
 -- Exportar e importar conserva el orden, el sonido y los objetos
+local orderBefore = table.concat(ns.db.activeOrder, " ")
 local text = ns.ExportProfile()
 ns.db.activeOrder, ns.db.activeSound, ns.db.activeItems = {}, {}, {}
 assert(ns.ImportProfile(text), "importa")
-assert(ns.db.activeOrder[1] == "spell400" and ns.db.activeOrder[3] == "item5512" and ns.db.activeSound.spell400
-    and ns.db.activeItems[5512], "importar recupera orden, sonido y objetos")
+assert(table.concat(ns.db.activeOrder, " ") == orderBefore and ns.db.activeSound.spell400 and ns.db.activeItems[5512],
+    "importar recupera orden, sonido y objetos: " .. table.concat(ns.db.activeOrder, " "))
 
 -- Valores por defecto de la página: vuelve todo como al principio
 ns.ResetKeys(page.resetKeys)

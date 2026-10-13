@@ -343,6 +343,9 @@ M.Tick(0.2)
 assert(bb.Bar:GetAlpha() == 1 and bb.Bar.Duration:GetParent() == bb.Bar and bb.Bar.Duration:GetPoint(1) == "RIGHT",
     "sin la opción: la barra vuelve como estaba")
 assert(bb:GetPoint(1) == "TOPLEFT" and near(bb:GetScale(), 1) and bb:IsMouseMotionEnabled(), "y en su sitio de Blizzard")
+local dpoint, drel, drelPoint, dx = bb.Bar.Duration:GetPoint(1)
+assert(dpoint == "RIGHT" and drel == bb.Bar and drelPoint == "RIGHT" and dx == -8,
+    "el tiempo vuelve al sitio de la plantilla de Blizzard (sin leer sus anclas, que pueden ser secretas)")
 ns.db.activeBuffBars = true
 bb.isActive = false
 M.Tick(0.2)
@@ -388,6 +391,38 @@ ns.db.activeShow = "hidden"; M.Tick(0.2)
 assert(not bar:IsShown() and not blizzardShown(e1), "oculta: no se ve nada")
 ns.db.activeShow = "blizzard"; M.Tick(0.2)
 assert(bar:IsShown(), "como esenciales: vuelve")
+
+-- Lo que termina mientras la barra no se ve no se anuncia al volver (ni sonido ni destello)
+ns.db.activeShow, ns.db.activeSound.spell2 = "combat", true
+M.inCombat = true
+spells[2] = { active = true, gcd = false }
+update(); M.Tick(1); M.Tick(1)
+assert(icon("spell2"):IsShown(), "en combate, en cooldown")
+M.inCombat = false; M.FireEvent("PLAYER_REGEN_ENABLED")
+spells[2].active = false
+update()
+M.inCombat = true; M.FireEvent("PLAYER_REGEN_DISABLED")
+assert(#played == 0 and not ns.GetActiveFlash("spell2"):IsShown(), "al volver no suena lo que terminó sin verse")
+M.inCombat = false
+ns.db.activeShow, ns.db.activeSound.spell2 = "blizzard", nil
+spells[2] = { active = true, gcd = false } -- vuelve a estar en cooldown para lo que sigue
+update()
+
+-- Al entrar en combate la barra desbloqueada se bloquea sola
+ns.SetActiveUnlocked(true)
+M.inCombat = true; M.FireEvent("PLAYER_REGEN_DISABLED")
+assert(not ns.activeUnlocked and not bar.bg:IsShown(), "en combate se bloquea")
+M.inCombat = false; M.Tick(0.2)
+
+-- Un cooldown lanzado con la barra desactivada sale al activarla
+ns.db.activeOnly = false
+spells[3] = { active = true, gcd = false }
+update()
+ns.db.activeOnly = true
+ns.RefreshActiveBar()
+assert(icon("spell3"):IsShown(), "sale al activar la barra")
+spells[3] = { active = false, gcd = false }
+update(); M.Tick(1.2)
 
 -- Montura y descanso: si se pide, la barra no se ve
 local mounted, resting = false, false

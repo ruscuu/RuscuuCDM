@@ -993,7 +993,12 @@ local function BuildActive(ui, panel)
 
     ui:Section(L["Position"])
     ui:DBChoice(1, L["Anchor"], "activeAnchor", AnchorOptions,
-        L["On the essential cooldowns: the bar moves with them in Edit Mode. Free on the screen: it has its own place."])
+        L["On the essential cooldowns: the bar moves with them in Edit Mode. Free on the screen: it has its own place."],
+        function()
+            -- La barra se queda donde está; cambia el desplazamiento, que ahora se mide desde la nueva ancla
+            SafeCall(ns.SaveActivePosition)
+            ApplyStyle()
+        end)
     ui:Check(2, L["Unlock to drag"],
         function() return ns.activeUnlocked end,
         function(on) SafeCall(ns.SetActiveUnlocked, on) end,
