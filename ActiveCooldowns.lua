@@ -16,6 +16,7 @@ local _, ns = ...
 local L = ns.L
 
 local LINGER = 1             -- segundos que se ve un icono con destello tras terminar su cooldown
+local MIN_FLASH = 1.6        -- sin destello si el icono se vio menos que un tiempo de reutilización global
 local EVAL_INTERVAL = 0.1    -- cada cuánto se revisa qué cooldowns están activos
 local COOLDOWN_VIEWERS = { "EssentialCooldownViewer", "UtilityCooldownViewer" }
 local BUFF_VIEWER = "BuffIconCooldownViewer"
@@ -359,7 +360,9 @@ local function SpellState(id)
     end
     apiState = true
     if not info.isActive then latched[id] = nil end
-    local empty = info.isActive and (latched[id] or not onGCD[id])
+    -- Solo cuenta si el aviso de cambio de cooldowns confirmó que no es el GCD. Al lanzar algo, todos los
+    -- hechizos pasan un instante a "en cooldown" antes de ese aviso: sin esto saldrían todos de golpe.
+    local empty = info.isActive and latched[id] == true
     local okc, charges = GetCharges(id)
     local max = okc and type(charges) == "table" and charges.maxCharges
     local isCharge = type(max) == "number" and not ns.IsSecret(max) and max > 1
@@ -740,6 +743,8 @@ local function AttachRanks(list)
     end
 end
 
+local CaptureGCD -- más abajo: anota qué cooldowns son reales y cuáles solo el GCD
+
 local function RebuildEntries()
     RebuildPetSlots()
     ReadCDMSpells()
@@ -763,6 +768,9 @@ local function RebuildEntries()
         end
     end
     entriesDirty, cooldownsDirty, lastLine = false, true, nil
+    -- Hechizos nuevos en la barra (al entrar al juego o al elegirlos) que ya estaban en cooldown: se anotan ya,
+    -- sin esperar al siguiente aviso del juego. Solo los que nunca se anotaron, para no fiarse de un GCD a medias.
+    pcall(CaptureGCD, true)
 end
 
 local function Update()
@@ -839,7 +847,8 @@ local function Update()
             end
         end
 
-        if f.wasActive and not active and db.activeFlash then
+        if active and not f.wasActive then f.activeSince = now end
+        if f.wasActive and not active and db.activeFlash and now - (f.activeSince or now) >= MIN_FLASH then
             f.lingerUntil = now + LINGER -- acaba de terminar: un momento visible con destello
         end
         f.wasActive = active
@@ -903,10 +912,13 @@ driver:SetScript("OnUpdate", function(_, elapsed)
 end)
 
 -- isOnGCD solo es fiable al recibir el aviso de cambio de cooldowns: se anota en ese momento
-local function CaptureGCD()
+function CaptureGCD(onlyNew)
     local ids = {}
     for _, entry in ipairs(entries) do
-        for _, rank in ipairs(entry.ranks or { entry.spell }) do ids[#ids + 1] = Resolve(rank) end
+        for _, rank in ipairs(entry.ranks or { entry.spell }) do
+            local id = Resolve(rank)
+            if not (onlyNew and onGCD[id] ~= nil) then ids[#ids + 1] = id end
+        end
     end
     for _, id in ipairs(ids) do
         local ok, info = GetCooldown(id)
@@ -943,7 +955,7 @@ events:SetScript("OnEvent", function(_, event)
         cooldownsDirty = true
     end
     if not (ns.db and ns.db.activeOnly) then return end
-    if event == "SPELL_UPDATE_COOLDOWN" then pcall(CaptureGCD) end
+    if event == "SPELL_UPDATE_COOLDOWN" or event == "PLAYER_ENTERING_WORLD" then pcall(CaptureGCD) end
     SafeUpdate()
 end)
 
