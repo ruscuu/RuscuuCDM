@@ -150,6 +150,7 @@ ns.PROFILE_DEFAULTS = {
     activeOnly = false,
     activeFlash = true,                       -- al terminar, el icono se queda un segundo con un destello
     activeBuffs = true,                       -- los buffs activos del Cooldown Manager van en la misma línea
+    activeShow = "blizzard",                  -- cuándo se ve: blizzard (como esenciales) | always | combat | hidden
     activeSize = 40,                          -- tamaño de los iconos de la barra
     activeSpacing = 4,                        -- separación entre iconos
     activeCDM = true,                         -- incluir los hechizos de esenciales y utilidad
@@ -243,6 +244,7 @@ ns.CHOICES = {
     keybindOutline = { NONE = true, OUTLINE = true, THICKOUTLINE = true, MONOCHROME = true },
     keybindAnchor = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true },
     expirePulse = { none = true, pulse = true, flash = true },
+    activeShow = { blizzard = true, always = true, combat = true, hidden = true },
 }
 
 -- Ajustes de la cuenta (no dependen del perfil)

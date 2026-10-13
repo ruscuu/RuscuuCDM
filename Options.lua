@@ -90,6 +90,15 @@ local function OutlineOptions()
     return list
 end
 
+local function ActiveShowOptions()
+    return {
+        { value = "blizzard", text = L["Like the essential cooldowns"] },
+        { value = "always", text = L["Always"] },
+        { value = "combat", text = L["Only in combat"] },
+        { value = "hidden", text = L["Hidden"] },
+    }
+end
+
 local function TriStateOptions()
     return {
         { value = "blizzard", text = L["Blizzard default"] },
@@ -214,7 +223,7 @@ function Layout:Slider(col, label, key, step, display, onChange, tip)
     local scale = DISPLAY_SCALE[display] or 1
     local s = CreateFrame("Slider", nil, self.content, "BackdropTemplate")
     s:SetOrientation("HORIZONTAL")
-    s:SetSize(self.colWidth - 92, 12)
+    s:SetSize(self.colWidth - 142, 12)
     s:SetPoint("TOPLEFT", x, y - 22)
     s:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
     s:SetBackdropColor(unpack(ns.COLORS.bg))
@@ -230,8 +239,18 @@ function Layout:Slider(col, label, key, step, display, onChange, tip)
 
     -- Cuadro con el valor: se puede escribir el número exacto (Intro) o ajustarlo con la rueda del ratón
     local box = CreateFrame("EditBox", nil, self.content, "BackdropTemplate")
-    box:SetSize(80, 20)
-    box:SetPoint("LEFT", s, "RIGHT", 8, 0)
+    -- Botones − y + a los lados del valor: ajustan de un paso en un paso
+    local minus = CreateFrame("Button", nil, self.content, "UIPanelButtonTemplate")
+    minus:SetSize(22, 20)
+    minus:SetPoint("LEFT", s, "RIGHT", 6, 0)
+    minus:SetText("-")
+    box:SetSize(70, 20)
+    box:SetPoint("LEFT", minus, "RIGHT", 2, 0)
+    local plus = CreateFrame("Button", nil, self.content, "UIPanelButtonTemplate")
+    plus:SetSize(22, 20)
+    plus:SetPoint("LEFT", box, "RIGHT", 2, 0)
+    plus:SetText("+")
+    box.minus, box.plus = minus, plus
     box:SetAutoFocus(false)
     box:SetFontObject("GameFontHighlightSmall")
     box:SetJustifyH("CENTER")
@@ -239,7 +258,6 @@ function Layout:Slider(col, label, key, step, display, onChange, tip)
     box:SetMaxLetters(12)
     box:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
     box:SetBackdropColor(0, 0, 0, 0.35)
-    box:EnableMouseWheel(true)
     local function boxBorder(alpha) box:SetBackdropBorderColor(PURPLE[1], PURPLE[2], PURPLE[3], alpha) end
     boxBorder(0.25)
 
@@ -293,14 +311,16 @@ function Layout:Slider(col, label, key, step, display, onChange, tip)
     end)
     box:SetScript("OnEscapePressed", function() box:ClearFocus() end)
     box:SetScript("OnHide", function() box:ClearFocus() end)
-    box:SetScript("OnMouseWheel", function(_, delta) setValue(ns.db[key] + delta * step) end)
+    -- La rueda del ratón no cambia nada: así se puede bajar por la página sin tocar los ajustes
+    minus:SetScript("OnClick", function() setValue(ns.db[key] - step) end)
+    plus:SetScript("OnClick", function() setValue(ns.db[key] + step) end)
     box:HookScript("OnEnter", function() if not box:HasFocus() then boxBorder(0.6) end end)
     box:HookScript("OnLeave", function() if not box:HasFocus() then boxBorder(0.25) end end)
 
     refresh()
     OnRefresh(refresh)
     AddTooltip(s, label, tip)
-    AddTooltip(box, label, L["Type a value and press Enter, or use the mouse wheel over it."])
+    AddTooltip(box, label, L["Type a value and press Enter, or use the - and + buttons."])
     return s
 end
 
@@ -943,7 +963,9 @@ local function BuildActive(ui, panel)
     ui:Next(30)
     ui:DBCheck(1, L["Buffs in the same line"], "activeBuffs",
         L["The active buffs of the Cooldown Manager (icons) go after the cooldowns, at the same size."])
-    ui:Next(32)
+    ui:DBChoice(2, L["Show the bar"], "activeShow", ActiveShowOptions,
+        L["When the bar is shown. \"Like the essential cooldowns\" follows the visibility chosen for them in Edit Mode."])
+    ui:Next(56)
     ui:Slider(1, L["Icon size"], "activeSize", 1, FormatPixels)
     ui:Slider(2, L["Spacing"], "activeSpacing", 1, FormatPixels)
     ui:Next(48)
@@ -1337,7 +1359,7 @@ local SUBPAGES = {
     {
         key = "active", titleKey = "Active cooldowns", descKey = "Only the cooldowns that are running, in one centered bar.",
         build = BuildActive,
-        resetKeys = { "activeOnly", "activeFlash", "activeBuffs", "activeSize", "activeSpacing", "activeCDM",
+        resetKeys = { "activeOnly", "activeFlash", "activeBuffs", "activeShow", "activeSize", "activeSpacing", "activeCDM",
             "activeAdd", "activeRemove", "activeTrinket1", "activeTrinket2" },
     },
     {

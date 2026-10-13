@@ -316,6 +316,21 @@ essential:Show()
 update()
 assert(bar:IsShown() and b1:GetPoint(1) == "CENTER", "esenciales visibles: vuelve la barra")
 
+-- Cuándo se ve la barra: siempre (aunque esenciales esté oculta), solo en combate u oculta
+essential:Hide()
+ns.db.activeShow = "always"; M.Tick(0.2)
+assert(bar:IsShown(), "siempre: se ve aunque esenciales esté oculta")
+essential:Show()
+ns.db.activeShow = "combat"; M.inCombat = false; M.Tick(0.2)
+assert(not bar:IsShown() and b1:GetPoint(1) == "TOPLEFT", "solo en combate: fuera de combate no se ve")
+M.inCombat = true; M.FireEvent("PLAYER_REGEN_DISABLED")
+assert(bar:IsShown() and b1:GetPoint(1) == "CENTER", "solo en combate: al entrar en combate se ve al momento")
+M.inCombat = false
+ns.db.activeShow = "hidden"; M.Tick(0.2)
+assert(not bar:IsShown() and not blizzardShown(e1), "oculta: no se ve nada")
+ns.db.activeShow = "blizzard"; M.Tick(0.2)
+assert(bar:IsShown(), "como esenciales: vuelve")
+
 -- Modo de edición abierto: todo como Blizzard
 EditModeManagerFrame = { IsEditModeActive = function() return true end }
 M.Tick(0.2)
