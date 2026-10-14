@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.0
+
+**New** (Active cooldowns bar)
+- **Choose buffs and debuffs**: pick the buffs on you (for example talent procs that trigger on their own) and the debuffs you put on your target that should show in the bar while they are active, with their time left, their stacks and the "buff about to end" border. The options list the ones you had in this session, or add any of them by ID or name. Saved in the active profile, so each class keeps its own.
+- A short flash when one of them appears, and the order page's **Sound** also works for them: it plays when the buff or debuff appears.
+- In combat the game may hide which auras are which: a buff found before keeps showing while it lasts, and `/rcm debug` says whether the game is hiding them.
+
 ## v0.6.2
 
 **Fixed**

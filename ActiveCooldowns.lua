@@ -354,8 +354,119 @@ function ns.FindItem(text)
     if ok and found then return id end
 end
 
--- Lo que muestra la barra: hechizos del Cooldown Manager, los añadidos (por nombre), los abalorios y los objetos,
--- en el orden que eligió el jugador (lo que no tiene sitio en ese orden va al final)
+------------------------------------------------------------------------
+-- Beneficios y perjuicios elegidos (procs de talentos y efectos que saltan solos)
+------------------------------------------------------------------------
+
+-- Beneficios: en el personaje. Perjuicios: los que el personaje pone en su objetivo.
+local AURA_KINDS = {
+    buff = { unit = "player", filter = "HELPFUL", key = "activeAuraBuffs" },
+    debuff = { unit = "target", filter = "HARMFUL|PLAYER", key = "activeAuraDebuffs" },
+}
+local AURA_ORDER = { "buff", "debuff" }
+local MAX_AURAS = 255
+local SEEN_MAX_DURATION = 300 -- en la lista de vistos no entran las auras largas (comida, montura, bendiciones de 1 h)
+
+local auraInstances = {}     -- clave de la entrada -> auraInstanceID de la última vez que se encontró
+local seenAuras = { buff = {}, debuff = {} } -- spellID -> { spellID, name, icon }: vistos en esta sesión
+local aurasHidden = false    -- el juego ocultó qué auras son (en combate) en la última búsqueda
+
+local function AuraAt(unit, index, filter)
+    if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex) then return end
+    local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, unit, index, filter)
+    if ok and type(aura) == "table" then return aura end
+end
+
+local function UnitGone(unit)
+    if unit == "player" or not UnitExists then return false end
+    local ok, exists = pcall(UnitExists, unit)
+    return ok and type(exists) == "boolean" and not ns.IsSecret(exists) and not exists
+end
+
+-- Anota las auras que se pueden leer, para ofrecerlas en la lista de opciones aunque ya hayan terminado
+local function RecordAuras(kindName)
+    local kind, seen = AURA_KINDS[kindName], seenAuras[kindName]
+    for i = 1, MAX_AURAS do
+        local aura = AuraAt(kind.unit, i, kind.filter)
+        if not aura then break end
+        local id, name, duration = aura.spellId, aura.name, aura.duration
+        if type(id) == "number" and not ns.IsSecret(id) and not seen[id] and type(duration) == "number"
+            and not ns.IsSecret(duration) and duration > 0 and duration <= SEEN_MAX_DURATION then
+            local icon = aura.icon
+            seen[id] = {
+                spellID = id,
+                name = type(name) == "string" and not ns.IsSecret(name) and name or SpellName(id),
+                icon = not ns.IsSecret(icon) and icon or nil,
+            }
+        end
+    end
+end
+
+-- Auras vistas en esta sesión más las elegidas, para la lista de opciones: { spellID, name, icon }
+function ns.GetActiveAuraList(kindName)
+    pcall(RecordAuras, kindName)
+    local list, seen = {}, {}
+    for id, sp in pairs(seenAuras[kindName]) do
+        seen[id] = true
+        list[#list + 1] = sp
+    end
+    for id, on in pairs(ns.db[AURA_KINDS[kindName].key]) do
+        if on and type(id) == "number" and not seen[id] then
+            local ok, icon = pcall(C_Spell.GetSpellTexture, id)
+            list[#list + 1] = { spellID = id, name = SpellName(id), icon = ok and icon or nil }
+        end
+    end
+    table.sort(list, function(a, b)
+        if a.name ~= b.name then return a.name < b.name end
+        return a.spellID < b.spellID
+    end)
+    return list
+end
+
+function ns.IsActiveAuraChosen(kindName, spellID)
+    return ns.db[AURA_KINDS[kindName].key][spellID] == true
+end
+
+function ns.SetActiveAuraChosen(kindName, spellID, on)
+    ns.db[AURA_KINDS[kindName].key][spellID] = on and true or nil
+    entriesDirty = true
+end
+
+-- ¿Tiene ahora la unidad el aura de una entrada? Devuelve true y su auraInstanceID (y sus datos), o false.
+-- Se busca por número y por nombre (cada rango es otro hechizo con el mismo nombre). Si el juego oculta qué
+-- auras son (en combate), se sigue la que se encontró antes mientras exista.
+local function AuraState(entry)
+    local kind = AURA_KINDS[entry.auraKind]
+    local unit = kind.unit
+    if UnitGone(unit) then
+        auraInstances[entry.key] = nil
+        return false
+    end
+    local hidden = false
+    for i = 1, MAX_AURAS do
+        local aura = AuraAt(unit, i, kind.filter)
+        if not aura then break end
+        local id, name = aura.spellId, aura.name
+        local plainID, plainName = not ns.IsSecret(id), not ns.IsSecret(name)
+        if (plainID and entry.auraIDs[id]) or (plainName and name == entry.auraName) then
+            local instance = aura.auraInstanceID
+            if not ns.IsSecret(instance) then auraInstances[entry.key] = instance end
+            return true, instance, aura
+        end
+        if not plainID and not plainName then hidden = true end
+    end
+    if hidden then aurasHidden = true end
+    local instance = auraInstances[entry.key]
+    if hidden and instance and C_UnitAuras.GetAuraDataByAuraInstanceID then
+        local ok, aura = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, unit, instance)
+        if ok and type(aura) == "table" then return true, instance, aura end
+    end
+    auraInstances[entry.key] = nil
+    return false
+end
+
+-- Lo que muestra la barra: hechizos del Cooldown Manager, los añadidos (por nombre), los abalorios, los objetos
+-- y los beneficios y perjuicios elegidos, en el orden que eligió el jugador (lo que no tiene sitio va al final)
 local function BuildEntries()
     local db = ns.db
     local entries, seen = {}, {}
@@ -393,6 +504,28 @@ local function BuildEntries()
         return a.id < b.id
     end)
     for _, it in ipairs(items) do entries[#entries + 1] = { key = "item" .. it.id, item = it.id } end
+    for _, kindName in ipairs(AURA_ORDER) do
+        local auras = {}
+        for id, on in pairs(db[AURA_KINDS[kindName].key]) do
+            if on and type(id) == "number" then auras[#auras + 1] = { id = id, name = SpellName(id) } end
+        end
+        table.sort(auras, function(a, b)
+            if a.name ~= b.name then return a.name < b.name end
+            return a.id < b.id
+        end)
+        -- Varios rangos del mismo beneficio: un solo icono, que sale con cualquiera de ellos
+        local byName = {}
+        for _, a in ipairs(auras) do
+            local e = byName[a.name]
+            if e then
+                e.auraIDs[a.id] = true
+            else
+                e = { key = kindName .. a.id, aura = a.id, auraKind = kindName, auraIDs = { [a.id] = true }, auraName = a.name }
+                byName[a.name] = e
+                entries[#entries + 1] = e
+            end
+        end
+    end
 
     local rank = {}
     for i, key in ipairs(db.activeOrder) do
@@ -535,13 +668,16 @@ local function ShowTooltip(f)
         GameTooltip:SetInventoryItem("player", f.entry.slot)
     elseif f.entry.item then
         GameTooltip:SetItemByID(f.entry.item)
+    elseif f.entry.aura then
+        GameTooltip:SetSpellByID(f.entry.aura)
     else
         GameTooltip:SetSpellByID(f.spellID or f.entry.spell)
     end
     GameTooltip:Show()
 end
 
-local function NewIcon()
+-- kind = "buff" en los beneficios y perjuicios: su borde es el de "buff a punto de terminar"
+local function NewIcon(kind)
     local f = CreateFrame("Frame", nil, bar)
     f:SetSize(40, 40)
     f.icon = f:CreateTexture(nil, "ARTWORK")
@@ -573,7 +709,7 @@ local function NewIcon()
     f:SetScript("OnEnter", ShowTooltip)
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- Borde dorado: el juego decide el color con el DurationObject del cooldown
-    ns.TrackExpire(f, f.icon, function() return ns.ActiveIconDuration(f) end)
+    ns.TrackExpire(f, f.icon, function() return ns.ActiveIconDuration(f) end, kind)
     f:Hide()
     return f
 end
@@ -581,7 +717,7 @@ end
 local function GetIcon(entry)
     local f = icons[entry.key]
     if not f then
-        f = NewIcon()
+        f = NewIcon(entry.aura and "buff" or nil)
         icons[entry.key] = f
     end
     f.entry = entry
@@ -622,6 +758,9 @@ local function UpdateTexture(f)
         texture = ok and tex or nil
     elseif entry.item then
         texture = ns.ActiveItemIcon(entry.item)
+    elseif entry.aura then
+        local ok, tex = pcall(C_Spell.GetSpellTexture, entry.aura)
+        texture = ok and tex or nil
     else
         -- Con el hechizo base: el juego ya da el icono del que lo sustituye, y vuelve al original al terminar
         local ok, tex, _, conditional = pcall(C_Spell.GetSpellTexture, entry.spell)
@@ -638,6 +777,7 @@ function ns.ActiveIconDuration(f)
     local kind = f.durationKind
     if not kind then return end
     if kind == "slot" then return f.slotDuration end
+    if kind == "aura" then return f.auraDuration end
     local ok, d
     if kind == "charge" then
         ok, d = GetChargeDuration(f.spellID)
@@ -719,12 +859,49 @@ local function ApplySlotCooldown(f, db, active, start, duration)
     end
 end
 
+-- Beneficio o perjuicio activo: barrido con el tiempo restante y acumulaciones. Los dos se piden al juego por
+-- el auraInstanceID y se pasan tal cual (pueden ser secretos); sin esas funciones, solo las acumulaciones legibles.
+local function ApplyAura(f, db, instance, aura)
+    local unit = AURA_KINDS[f.entry.auraKind].unit
+    local duration
+    if instance ~= nil and C_UnitAuras.GetAuraDuration then
+        local ok, d = pcall(C_UnitAuras.GetAuraDuration, unit, instance)
+        duration = ok and d or nil
+    end
+    if duration then
+        f.cd:SetCooldownFromDurationObject(duration)
+    else
+        f.cd:Clear()
+    end
+    f.auraDuration = duration
+    f.durationKind = duration and "aura" or nil
+    f.cd:SetDrawSwipe(db.showSwipe and duration ~= nil)
+    f.cd:SetDrawEdge(db.cooldownEdge == "show")
+    f.icon:SetDesaturated(false)
+    local text
+    if instance ~= nil and C_UnitAuras.GetAuraApplicationDisplayCount then
+        local ok, t = pcall(C_UnitAuras.GetAuraApplicationDisplayCount, unit, instance, 2, 99)
+        if ok then text = t end
+    end
+    if text == nil and aura then
+        local n = aura.applications
+        if type(n) == "number" and not ns.IsSecret(n) and n > 1 then text = n end
+    end
+    if text ~= nil then
+        f.count:SetText(text) -- puede ser secreto: se pasa tal cual, sin mirarlo
+        f.count:Show()
+    else
+        f.count:Hide()
+    end
+end
+
 ------------------------------------------------------------------------
 -- Actualización
 ------------------------------------------------------------------------
 
 local cooldownsDirty = true  -- llegó un aviso de cambio de cooldowns: se vuelven a pedir al juego
 local texturesDirty = false  -- cambió el icono de algún hechizo
+local aurasDirty = true      -- cambiaron las auras del personaje o del objetivo
 
 -- Mientras se configuran las barras se ve todo como lo deja Blizzard
 local function Editing()
@@ -900,7 +1077,7 @@ local function RestoreAll()
     end
     for _, f in pairs(icons) do
         -- Al volver se pide todo de nuevo al juego (barrido, cargas y borde dorado)
-        f.wasActive, f.lingerUntil, f.durationKind, f.style = nil, nil, nil, nil
+        f.wasActive, f.lingerUntil, f.flashUntil, f.durationKind, f.style = nil, nil, nil, nil, nil
         f.cd:Clear()
         f.flash:Hide()
         f:Hide()
@@ -1040,7 +1217,7 @@ local function RebuildEntries()
     end
     for _, f in pairs(icons) do
         if not used[f] then
-            f.entry, f.wasActive, f.lingerUntil, f.durationKind, f.style = nil, nil, nil, nil, nil
+            f.entry, f.wasActive, f.lingerUntil, f.flashUntil, f.durationKind, f.style = nil, nil, nil, nil, nil, nil
             f.cd:Clear()
             f.flash:Hide()
             f:Hide()
@@ -1085,7 +1262,7 @@ local function Update()
         for _, item in ipairs(ViewerItems(barViewer)) do RestoreBuff(item) end
         -- Lo que termine sin verse no se anuncia al volver (ni destello ni sonido de algo que acabó hace rato)
         for _, f in pairs(icons) do
-            f.wasActive, f.lingerUntil = nil, nil
+            f.wasActive, f.lingerUntil, f.flashUntil = nil, nil, nil
             f.flash:Hide()
         end
         bar:Hide()
@@ -1106,8 +1283,9 @@ local function Update()
         for _, f in pairs(icons) do f.style = nil end
     end
 
-    local refresh, textures = cooldownsDirty, texturesDirty
-    cooldownsDirty, texturesDirty = false, false
+    local refresh, textures, auras = cooldownsDirty, texturesDirty, aurasDirty
+    cooldownsDirty, texturesDirty, aurasDirty = false, false, false
+    aurasHidden = false
     local line = {}
     for _, entry in ipairs(entries) do
         local f = icons[entry.key]
@@ -1124,6 +1302,29 @@ local function Update()
             f.wasActive, f.lingerUntil = nil, nil
             f:Show()
             line[#line + 1] = f
+        elseif entry.aura then
+            -- Beneficio o perjuicio: se ve mientras está, con destello y sonido (si se eligió) al aparecer
+            local active, instance, aura = AuraState(entry)
+            if textures then UpdateTexture(f) end
+            local style = "aura" .. (ns.IsSecret(instance) and "?" or tostring(instance))
+            if refresh or auras or style ~= f.style then
+                f.style = style
+                if active then
+                    ApplyAura(f, db, instance, aura)
+                else
+                    f.cd:Clear()
+                    f.durationKind, f.auraDuration = nil, nil
+                    f.count:Hide()
+                end
+            end
+            -- Solo si se vio antes sin ella (no al entrar al juego o al volver a mostrarse la barra)
+            if active and f.wasActive == false then
+                if db.activeFlash then f.flashUntil = now + LINGER end
+                if db.activeSound[entry.key] then ns.PlayActiveSound(db.activeSoundChoice) end
+            end
+            f.wasActive = active
+            f:SetShown(active)
+            if active then line[#line + 1] = f end
         else
             local active, a, b, c
             if entry.spell then
@@ -1222,8 +1423,9 @@ end
 
 local function UpdateFlashes(now)
     for _, f in pairs(icons) do
-        if f.lingerUntil and now < f.lingerUntil then
-            f.flash:SetAlpha(0.8 * (f.lingerUntil - now) / LINGER)
+        local flashUntil = f.lingerUntil or f.flashUntil
+        if flashUntil and now < flashUntil then
+            f.flash:SetAlpha(0.8 * (flashUntil - now) / LINGER)
             f.flash:Show()
         elseif f.flash:IsShown() then
             f.flash:Hide()
@@ -1276,7 +1478,11 @@ local COOLDOWN_EVENTS = { SPELL_UPDATE_COOLDOWN = true, SPELL_UPDATE_CHARGES = t
 local LIST_EVENTS = { SPELLS_CHANGED = true, PLAYER_EQUIPMENT_CHANGED = true, PLAYER_SPECIALIZATION_CHANGED = true,
     PLAYER_TALENT_UPDATE = true, TRAIT_CONFIG_UPDATED = true, UNIT_PET = true, PET_BAR_UPDATE = true,
     GET_ITEM_INFO_RECEIVED = true }
+-- Auras del personaje y del objetivo: se anotan las que se ven y se revisa en el siguiente fotograma
+local AURA_EVENTS = { UNIT_AURA = true, PLAYER_TARGET_CHANGED = true }
 for event in pairs(COOLDOWN_EVENTS) do pcall(events.RegisterEvent, events, event) end
+pcall(events.RegisterUnitEvent, events, "UNIT_AURA", "player", "target")
+pcall(events.RegisterEvent, events, "PLAYER_TARGET_CHANGED")
 for event in pairs(LIST_EVENTS) do
     if event == "UNIT_PET" then
         pcall(events.RegisterUnitEvent, events, event, "player") -- solo la mascota del jugador
@@ -1284,7 +1490,23 @@ for event in pairs(LIST_EVENTS) do
         pcall(events.RegisterEvent, events, event)
     end
 end
-events:SetScript("OnEvent", function(_, event, itemID)
+events:SetScript("OnEvent", function(_, event, arg1) -- arg1: unidad (UNIT_AURA) u objeto (GET_ITEM_INFO_RECEIVED)
+    if AURA_EVENTS[event] then
+        aurasDirty = true
+        if event == "PLAYER_TARGET_CHANGED" then
+            -- Los perjuicios encontrados eran del objetivo anterior
+            for key in pairs(auraInstances) do
+                if key:match("^debuff") then auraInstances[key] = nil end
+            end
+        end
+        if event == "PLAYER_TARGET_CHANGED" or arg1 == "target" then
+            pcall(RecordAuras, "debuff")
+        else
+            pcall(RecordAuras, "buff")
+        end
+        if ns.db and ns.db.activeOnly then ns.RequestActiveUpdate() end
+        return
+    end
     if LIST_EVENTS[event] then
         entriesDirty = true
     elseif event == "SPELL_UPDATE_ICON" then
@@ -1300,7 +1522,7 @@ events:SetScript("OnEvent", function(_, event, itemID)
         if ns.RefreshOptions then ns.RefreshOptions() end
     end
     if event == "GET_ITEM_INFO_RECEIVED" then
-        if not (ns.db and ns.db.activeItems[itemID]) then return end
+        if not (ns.db and ns.db.activeItems[arg1]) then return end
         if ns.RefreshOptions then ns.RefreshOptions() end -- el nombre del objeto ya está
     end
     if not (ns.db and ns.db.activeOnly) then return end
@@ -1355,6 +1577,11 @@ function ns.ActiveCooldownAPI()
     return apiState
 end
 
+-- Para /rcm debug: el juego ocultó qué auras son en la última revisión (en combate)
+function ns.ActiveAurasHidden()
+    return aurasHidden
+end
+
 -- Para /rcm debug y las pruebas
 function ns.GetActiveBar() return bar end
 function ns.GetActiveIcon(key) return icons[key] end
@@ -1407,6 +1634,10 @@ function ns.GetActiveEntryList()
                 if slot == e.slot then name = ns.TrinketLabel(i) end
             end
             ok, tex = pcall(GetInventoryItemTexture, "player", e.slot)
+        elseif e.aura then
+            local label = e.auraKind == "buff" and L["%s (buff)"] or L["%s (debuff)"]
+            name = label:format(SpellName(e.aura))
+            ok, tex = pcall(C_Spell.GetSpellTexture, e.aura)
         else
             name = ItemName(e.item)
             ok, tex = true, ns.ActiveItemIcon(e.item)

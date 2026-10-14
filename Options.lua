@@ -1027,6 +1027,15 @@ local function BuildActive(ui, panel)
         local book = { title = L["Spellbook"], spells = {} }
         local added = { title = L["Added by ID or name"], spells = {} }
         local items = { title = L["Items"], spells = {} }
+        -- Beneficios y perjuicios: los vistos en esta sesión y los elegidos
+        local auraGroups = {}
+        for _, kind in ipairs({ "buff", "debuff" }) do
+            local g = { title = kind == "buff" and L["Buffs on you"] or L["Debuffs on your target"], spells = {} }
+            for _, sp in ipairs(ns.GetActiveAuraList(kind)) do
+                g.spells[#g.spells + 1] = { kind = kind, spellID = sp.spellID, name = sp.name, icon = sp.icon }
+            end
+            auraGroups[#auraGroups + 1] = g
+        end
         for id, on in pairs(ns.db.activeItems) do
             if on and type(id) == "number" then
                 items.spells[#items.spells + 1] = { kind = "item", spellID = id, name = ns.ActiveItemName(id),
@@ -1069,7 +1078,7 @@ local function BuildActive(ui, panel)
         end
 
         local y, rowCount, headerCount = listTop, 0, 0
-        for _, g in ipairs({ cdm, book, added, items }) do
+        for _, g in ipairs({ cdm, book, added, items, auraGroups[1], auraGroups[2] }) do
             local list = {}
             for _, sp in ipairs(g.spells) do
                 if matches(sp) then list[#list + 1] = sp end
@@ -1096,6 +1105,11 @@ local function BuildActive(ui, panel)
                                 ns.RefreshActiveBar()
                                 return
                             end
+                            if self.kind == "buff" or self.kind == "debuff" then
+                                ns.SetActiveAuraChosen(self.kind, self.spellID, on)
+                                ns.RefreshActiveBar()
+                                return
+                            end
                             if on then
                                 ns.SetActiveSpellChosen(self.spellID, true)
                             else
@@ -1114,6 +1128,8 @@ local function BuildActive(ui, panel)
                     row.kind = sp.kind
                     if sp.kind == "item" then
                         ShowSpellRow(row, sp, ns.db.activeItems[sp.spellID] == true)
+                    elseif sp.kind == "buff" or sp.kind == "debuff" then
+                        ShowSpellRow(row, sp, ns.IsActiveAuraChosen(sp.kind, sp.spellID))
                     else
                         ShowSpellRow(row, sp, AnyRankChosen(row.ranks))
                     end
@@ -1172,6 +1188,28 @@ local function BuildActive(ui, panel)
         ns.Print(L["Added to the active cooldowns bar: %s"]:format(ns.ActiveItemName(id)), true)
     end, nil, L["Type an item ID (for example 5512, a healthstone) or the exact name of an item in your bags and press Enter."])
     ui:Next(54)
+    _, h = ui:Note(L["Buffs and debuffs: check the ones you want to see in the bar while they are active, with their time left and stacks (for example talent procs that trigger on their own). The lists below show the ones you had in this session; if one is missing, get it once or add it by ID or name."])
+    ui:Next(h)
+    local function auraBox(col, kind, label, tip)
+        local box
+        box = ui:EditBox(col, label, function(text)
+            local id = ns.FindSpell(text)
+            if not id then
+                ns.Print(L["Spell not found: %s"]:format(strtrim(text or "")), true)
+                return
+            end
+            ns.SetActiveAuraChosen(kind, id, true)
+            box:SetText("")
+            ns.RefreshActiveBar()
+            Rebuild()
+            ns.Print(L["Added to the active cooldowns bar: %s"]:format(SpellName(id)), true)
+        end, nil, tip)
+    end
+    auraBox(1, "buff", L["Add a buff by ID or name"],
+        L["Type the ID or exact name of a buff (for example a talent proc) and press Enter. It shows in the bar while you have it."])
+    auraBox(2, "debuff", L["Add a debuff by ID or name"],
+        L["Type the ID or exact name of a debuff that you put on your target and press Enter. It shows in the bar while your target has it."])
+    ui:Next(54)
     listTop = ui.y
     emptyNote = ui:Note(L["No spells found. Enable the Cooldown Manager or type a spell above."])
     emptyNote:Hide()
@@ -1184,7 +1222,7 @@ end
 ------------------------------------------------------------------------
 
 local function BuildActiveOrder(ui, panel)
-    local _, h = ui:Note(L["The icons go in this order, from left to right. Mark \"Sound\" to hear one when that cooldown is ready."])
+    local _, h = ui:Note(L["The icons go in this order, from left to right. Mark \"Sound\" to hear one when that cooldown is ready, or when that buff or debuff appears."])
     ui:Next(h)
     ui:DBChoice(1, L["Sound"], "activeSoundChoice", SoundOptions)
     ui:Next(18)
@@ -1518,7 +1556,7 @@ local SUBPAGES = {
         build = BuildActive,
         resetKeys = { "activeOnly", "activeFlash", "activeBuffs", "activeShow", "activeBuffBars", "activeHideMounted",
             "activeHideResting", "activeAnchor", "activeX", "activeY", "activeItems", "activeSize", "activeSpacing", "activeCDM",
-            "activeAdd", "activeRemove", "activeTrinket1", "activeTrinket2" },
+            "activeAdd", "activeRemove", "activeTrinket1", "activeTrinket2", "activeAuraBuffs", "activeAuraDebuffs" },
     },
     {
         key = "activeorder", titleKey = "Active cooldowns: order and sound",

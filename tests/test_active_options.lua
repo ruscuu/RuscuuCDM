@@ -108,17 +108,20 @@ assert(ns.db.activeAdd[210] and ns.db.activeRemove[100], "se guarda lo elegido")
 assert(r[210]:GetChecked() and not r[100]:GetChecked(), "las casillas siguen lo elegido")
 
 -- Buscador
-local search, add, itemBox
+local search
+local boxes = {}
 for _, f in ipairs(M.frames) do
     if f._type == "EditBox" and f._parent == page.content then
         if f._scripts.OnTextChanged then
             search = f
         elseif f._scripts.OnEnterPressed and not f.plus then -- los de los deslizadores tienen botones - y +
-            if add then itemBox = f else add = f end
+            boxes[#boxes + 1] = f
         end
     end
 end
-assert(search and add and itemBox, "cuadros de buscar, añadir hechizo y añadir objeto")
+local add, itemBox, buffBox, debuffBox = unpack(boxes)
+assert(search and add and itemBox and buffBox and debuffBox,
+    "cuadros de buscar, añadir hechizo, objeto, beneficio y perjuicio")
 search:SetText("portal"); search:Fire("OnTextChanged", true)
 r = rows()
 assert(r[300] and not r[210] and not r[100], "el buscador filtra por nombre")
@@ -221,7 +224,33 @@ assert(ns.ImportProfile(text), "importa")
 assert(table.concat(ns.db.activeOrder, " ") == orderBefore and ns.db.activeSound.spell400 and ns.db.activeItems[5512],
     "importar recupera orden, sonido y objetos: " .. table.concat(ns.db.activeOrder, " "))
 
+-- Beneficios y perjuicios: los vistos en esta sesión salen en su sección, se marcan y se añaden por número
+local playerAuras = { { spellId = 500, name = "Furia", auraInstanceID = 1, duration = 12 } }
+C_UnitAuras = { GetAuraDataByIndex = function(unit, i) if unit == "player" then return playerAuras[i] end end }
+known[500], known[600] = true, true
+M.FireEvent("UNIT_AURA", "player")
+page:Hide(); page:Show(); page:Fire("OnShow")
+assert(headers():find("Beneficios en ti %(1%)") and rows()[500], "el proc visto sale en su sección: " .. headers())
+assert(not rows()[500]:GetChecked(), "sin marcar hasta elegirlo")
+rows()[500]:SetChecked(true); rows()[500]:Fire("OnClick")
+assert(ns.db.activeAuraBuffs[500] and not ns.db.activeAdd[500], "marcado como beneficio, no como hechizo")
+print = function(msg) printed[#printed + 1] = msg end
+debuffBox:SetText("600"); debuffBox:Fire("OnEnterPressed")
+assert(ns.db.activeAuraDebuffs[600] and debuffBox:GetText() == "", "perjuicio añadido por número")
+assert(headers():find("Perjuicios en tu objetivo %(1%)") and rows()[600], "sale en su sección: " .. headers())
+buffBox:SetText("99999"); buffBox:Fire("OnEnterPressed")
+print = realPrint
+assert(not ns.db.activeAuraBuffs[99999] and printed[#printed]:find("99999"), "un beneficio que no existe no se añade")
+orderPage:Hide(); orderPage:Show(); orderPage:Fire("OnShow")
+assert(keys():find("buff500") and keys():find("debuff600"), "también en la página de orden: " .. keys())
+-- Exportar e importar los conserva
+text = ns.ExportProfile()
+ns.db.activeAuraBuffs, ns.db.activeAuraDebuffs = {}, {}
+assert(ns.ImportProfile(text), "importa")
+assert(ns.db.activeAuraBuffs[500] and ns.db.activeAuraDebuffs[600], "importar recupera beneficios y perjuicios")
+
 -- Valores por defecto de la página: vuelve todo como al principio
 ns.ResetKeys(page.resetKeys)
 assert(next(ns.db.activeAdd) == nil and next(ns.db.activeRemove) == nil and not ns.db.activeOnly, "valores por defecto")
+assert(next(ns.db.activeAuraBuffs) == nil and next(ns.db.activeAuraDebuffs) == nil, "sin beneficios ni perjuicios")
 print("página de cooldowns activos: OK")
