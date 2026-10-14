@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.6.3
+## v0.7.0
 
 **New**
 - **Threat meter on enemy nameplates**: above each enemy you are fighting, your threat as a bar, a percentage or both (100% means you would pull it), colored by the danger: low, about to pull it, pulled but barely, and attacking you. New **Threat** options page: what to show, width, height, position, every color, the number's size, color and place, and a 10-second test to adjust it out of combat. Needs enemy nameplates turned on (V key).
