@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.3
+
+**Fixed**
+- Shooting with a wand no longer makes every cooldown light up: the golden border on the Cooldown Manager and action buttons, and the active cooldowns bar, now ignore the short lock each wand shot puts on all spells (the game doesn't report it as the global cooldown). Real cooldowns keep showing while you shoot.
+- `/rcm debug` shows which spell is used to recognize that lock.
+
 ## v0.6.2
 
 **Fixed**

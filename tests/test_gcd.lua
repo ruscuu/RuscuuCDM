@@ -9,10 +9,13 @@ local SECRET = { __secret = true }
 local spells = {
     [10] = { remaining = 1.5, gcd = true },   -- solo el GCD
     [20] = { remaining = 2, gcd = false },    -- cooldown real a punto de terminar
+    [30] = { remaining = 0, gcd = false, active = false }, -- sin cooldown propio (como Bola de Fuego)
 }
+-- Cooldown base de cada hechizo (ms): solo el 30 no tiene cooldown propio
+GetSpellBaseCooldown = function(id) return id == 30 and 0 or 10000, 1500 end
 local function cooldownInfo(spellID)
     local s = spells[spellID]
-    return { isOnGCD = s.gcd, isActive = true, isEnabled = true, startTime = SECRET, duration = SECRET }
+    return { isOnGCD = s.gcd, isActive = s.active ~= false, isEnabled = true, startTime = SECRET, duration = SECRET }
 end
 C_Spell = {
     GetBaseSpell = function(id) return id end,
@@ -63,6 +66,36 @@ M.FireEvent("SPELL_UPDATE_COOLDOWN")
 M.FireEvent("ACTIONBAR_UPDATE_COOLDOWN")
 M.Tick()
 assert(M.ExpireBorder(gcdIcon) and M.ExpireBorder(gcdButton), "cooldown real después del GCD")
+
+-- Disparar con la varita: todos los hechizos quedan bloqueados un momento sin que el juego lo marque como GCD.
+-- El 10 no estaba en cooldown; el 20 sí (cooldown real ya visto), y lo sigue estando.
+ns.GetSpellbookSpells = function() return { { spellID = 20 }, { spellID = 30 } } end
+ns.SpellsChangedLock()
+spells[10] = { remaining = 0, gcd = false, active = false }
+M.FireEvent("SPELL_UPDATE_COOLDOWN")
+M.FireEvent("ACTIONBAR_UPDATE_COOLDOWN")
+M.Tick()
+assert(ns.GetLockReference() == 30, "referencia: el hechizo sin cooldown propio")
+spells[10] = { remaining = 1.5, gcd = false }
+spells[30] = { remaining = 1.5, gcd = false }
+M.FireEvent("SPELL_UPDATE_COOLDOWN")
+M.FireEvent("ACTIONBAR_UPDATE_COOLDOWN")
+M.Tick()
+assert(ns.GlobalLock(), "la varita bloquea todos los hechizos")
+assert(not M.ExpireBorder(gcdIcon), "la varita no enciende el borde en el Cooldown Manager")
+assert(not M.ExpireBorder(gcdButton), "la varita no enciende el borde en los botones de acción")
+assert(M.ExpireBorder(realIcon) and M.ExpireBorder(realButton), "un cooldown real sigue con borde mientras se dispara")
+-- Termina el bloqueo; después un cooldown real del 10 (con el GCD normal) sí lleva borde
+spells[10] = { remaining = 0, gcd = false, active = false }
+spells[30] = { remaining = 0, gcd = false, active = false }
+M.FireEvent("SPELL_UPDATE_COOLDOWN")
+spells[10] = { remaining = 2, gcd = false }
+spells[30] = { remaining = 1.5, gcd = true }
+M.FireEvent("SPELL_UPDATE_COOLDOWN")
+M.FireEvent("ACTIONBAR_UPDATE_COOLDOWN")
+M.Tick()
+assert(not ns.GlobalLock(), "el GCD normal no es un bloqueo de varita")
+assert(M.ExpireBorder(gcdIcon) and M.ExpireBorder(gcdButton), "cooldown real después de disparar")
 
 -- Si el juego no puede consultar el cooldown, el borde sigue funcionando como antes
 C_Spell.GetSpellCooldown = function() error("no disponible") end

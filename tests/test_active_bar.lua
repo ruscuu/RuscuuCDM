@@ -206,6 +206,22 @@ assert(icon("spell4"):IsShown() and not ns.GetActiveFlash("spell4"):IsShown(),
     "un cooldown real visto antes no se oculta (ni se despide) por el GCD")
 spells[4].gcd = false
 
+-- Disparar con la varita: todos los hechizos quedan bloqueados un momento sin que el juego lo marque como GCD
+-- (el 77 no tiene cooldown propio y sirve de referencia). No sale ninguno nuevo; los cooldowns reales siguen.
+spells[77] = { active = false, gcd = false }
+GetSpellBaseCooldown = function(id) return id == 77 and 0 or 10000, 1500 end
+local spellbook = ns.GetSpellbookSpells
+ns.GetSpellbookSpells = function() return { { spellID = 77 } } end
+ns.SpellsChangedLock()
+for _, id in ipairs({ 1, 3, 5, 77 }) do spells[id] = { active = true, gcd = false } end
+update()
+assert(shownKeys() == "spell2 spell4", "la varita no hace salir todos los hechizos: " .. shownKeys())
+for _, id in ipairs({ 1, 3, 5, 77 }) do spells[id] = { active = false, gcd = false } end
+update()
+assert(shownKeys() == "spell2 spell4", "sin destello al terminar el bloqueo: " .. shownKeys())
+ns.GetSpellbookSpells, GetSpellBaseCooldown = spellbook, nil
+ns.SpellsChangedLock()
+
 -- Tamaño y separación elegidos
 ns.db.activeSize, ns.db.activeSpacing = 50, 10
 ns.RefreshActiveBar()

@@ -28,7 +28,7 @@ read_globals = {
     -- Funciones
     "CreateColor", "CreateFont", "CreateFrame", "GetActionInfo", "GetBindingKey", "GetBindingText",
     "GetCursorPosition", "GetItemCooldown", "IsMounted", "IsResting", "UnitInVehicle", "GetFlyoutInfo", "GetFlyoutSlotInfo", "GetInventoryItemCooldown", "GetInventoryItemTexture", "GetLocale", "GetMinimapShape", "GetNumSpecializations", "GetPrimaryTalentTree",
-    "GetRealmName", "geterrorhandler", "GetSpecialization", "GetSpecializationInfo", "GetSpecializationInfoForClassID",
+    "GetRealmName", "geterrorhandler", "GetSpellBaseCooldown", "GetSpecialization", "GetSpecializationInfo", "GetSpecializationInfoForClassID",
     "GetTime", "HasAction", "hooksecurefunc", "InCombatLockdown", "IsLoggedIn", "IsPlayerSpell", "IsShiftKeyDown", "IsSpellKnown",
     "issecretvalue", "LibStub", "PlaySound", "ReloadUI", "SetCVar", "ShowUIPanel", "StaticPopup_Show",
     "UnitAffectingCombat", "UnitClass", "UnitName",

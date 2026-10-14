@@ -473,10 +473,74 @@ end
 
 -- ¿El cooldown de este hechizo es solo el tiempo de reutilización global? El juego nunca oculta este dato
 -- (isOnGCD), ni en combate. Sin él, el GCD encendería el borde en todos los botones al lanzar algo.
+--
+-- Disparar con la varita bloquea todos los hechizos un momento sin que el juego lo marque como GCD (isOnGCD).
+-- Se reconoce con un hechizo de referencia del libro que no tiene cooldown propio: si ese está "en cooldown",
+-- es un bloqueo de todos, no un cooldown real. Así un hechizo solo cuenta como cooldown real si se vio en
+-- cooldown fuera de ese bloqueo (y lo sigue siendo hasta que el juego diga que ya no está en cooldown).
+local NOT_REFERENCE = { [5019] = true, [75] = true, [6603] = true } -- Disparar, Disparo automático, Atacar
+local lockRef, lockRefDirty = nil, true
+local realCooldown = {} -- hechizo -> se vio en un cooldown real (ni GCD ni bloqueo)
+
+local function FindLockReference()
+    if not (GetSpellBaseCooldown and ns.GetSpellbookSpells) then return end
+    for _, spell in ipairs(ns.GetSpellbookSpells()) do
+        local id = spell.spellID
+        local ok, cooldownMS, gcdMS = pcall(GetSpellBaseCooldown, id)
+        local okCharges, charges = pcall(C_Spell.GetSpellCharges, id)
+        local hasCharges = okCharges and type(charges) == "table"
+        if ok and not NOT_REFERENCE[id] and not hasCharges and cooldownMS == 0 and type(gcdMS) == "number"
+            and not ns.IsSecret(gcdMS) and gcdMS > 0 then
+            return id
+        end
+    end
+end
+
+function ns.SpellsChangedLock()
+    lockRefDirty = true
+end
+
+-- ¿Están todos los hechizos bloqueados por algo que no es el GCD (como un disparo de varita)?
+function ns.GlobalLock()
+    if lockRefDirty then
+        local ok, id = pcall(FindLockReference)
+        lockRef, lockRefDirty = ok and id or nil, false
+    end
+    if not lockRef then return false end
+    local ok, info = pcall(C_Spell.GetSpellCooldown, lockRef)
+    if not ok or type(info) ~= "table" then return false end
+    local active, gcd = info.isActive, info.isOnGCD
+    if type(active) ~= "boolean" or ns.IsSecret(active) or not active then return false end
+    return gcd ~= true
+end
+
+function ns.GetLockReference()
+    if lockRefDirty then ns.GlobalLock() end
+    return lockRef
+end
+
+-- ¿El cooldown de este hechizo (que el juego no marca como GCD) es solo el bloqueo de todos?
+-- Se llama al recibir el aviso de cambio de cooldowns, que es cuando los datos son fiables.
+function ns.SpellLockedOnly(spellID, info)
+    if type(info) ~= "table" then return false end
+    local active = info.isActive
+    if type(active) ~= "boolean" or ns.IsSecret(active) then return false end
+    if not active then
+        realCooldown[spellID] = nil
+        return false
+    end
+    if realCooldown[spellID] then return false end
+    if ns.GlobalLock() then return true end
+    realCooldown[spellID] = true
+    return false
+end
+
 function ns.SpellOnGCD(spellID)
     if not spellID or ns.IsSecret(spellID) or not (C_Spell and C_Spell.GetSpellCooldown) then return false end
     local info = C_Spell.GetSpellCooldown(spellID)
-    return info ~= nil and info.isOnGCD == true
+    if info == nil then return false end
+    if info.isOnGCD == true then return true end
+    return ns.SpellLockedOnly(spellID, info)
 end
 
 -- El dato isOnGCD solo es fiable al recibir el aviso de cambio de cooldowns: se guarda en ese momento
@@ -505,7 +569,12 @@ end
 local gcdEvents = CreateFrame("Frame")
 gcdEvents:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 gcdEvents:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN")
-gcdEvents:SetScript("OnEvent", function()
+gcdEvents:RegisterEvent("SPELLS_CHANGED")
+gcdEvents:SetScript("OnEvent", function(_, event)
+    if event == "SPELLS_CHANGED" then
+        ns.SpellsChangedLock()
+        return
+    end
     for _, entry in pairs(tracked) do entry.gcd = CheckGCD(entry) end
 end)
 

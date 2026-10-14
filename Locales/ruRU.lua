@@ -79,6 +79,8 @@ L["Buffs about to end: aura API %s"] = "Заканчивающиеся бафф�
 L["Active cooldowns: cooldown state %s"] = "Активные восстановления: состояние восстановления %s"
 L["%d in the bar"] = "%d на панели"
 L["Active profile: %s"] = "Активный профиль: %s"
+L["Wand lock: reference spell %s, active now %s"] = "Жезл: опорное заклинание %s, блокировка сейчас %s"
+L["none"] = "нет"
 
 -- Botón del minimapa
 L["Left-click: open options"] = "ЛКМ: открыть настройки"

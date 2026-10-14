@@ -79,6 +79,8 @@ L["Buffs about to end: aura API %s"] = "Buffs a punto de terminar: API de auras 
 L["Active cooldowns: cooldown state %s"] = "Cooldowns activos: estado del cooldown %s"
 L["%d in the bar"] = "%d en la barra"
 L["Active profile: %s"] = "Perfil activo: %s"
+L["Wand lock: reference spell %s, active now %s"] = "Varita: hechizo de referencia %s, bloqueo ahora %s"
+L["none"] = "ninguno"
 
 -- Botón del minimapa
 L["Left-click: open options"] = "Clic izquierdo: abrir opciones"

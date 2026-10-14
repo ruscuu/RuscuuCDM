@@ -638,5 +638,9 @@ function ns.Debug()
     ns.Print(L["Buffs about to end: aura API %s"]:format(s.auraAPI and yes or no), true)
     ns.Print(L["Active cooldowns: cooldown state %s"]:format(s.activeAPI == nil and "?" or (s.activeAPI and yes or no))
         .. " · " .. L["%d in the bar"]:format(s.activeEntries), true)
+    local ref = ns.GetLockReference and ns.GetLockReference()
+    local refName = ref and C_Spell.GetSpellName and C_Spell.GetSpellName(ref) or ref
+    ns.Print(L["Wand lock: reference spell %s, active now %s"]:format(
+        ref and tostring(refName) or L["none"], ns.GlobalLock() and yes or no), true)
     ns.Print(L["Active profile: %s"]:format(ns.activeProfile), true)
 end

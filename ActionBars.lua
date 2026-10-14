@@ -118,7 +118,12 @@ local function ActionOnGCD(button)
     if not action then return false end
     if C_ActionBar and C_ActionBar.GetActionCooldown then
         local info = C_ActionBar.GetActionCooldown(action)
-        return info ~= nil and info.isOnGCD == true
+        if info == nil then return false end
+        if info.isOnGCD == true then return true end
+        -- Un disparo de varita bloquea todos los botones sin marcarlo como GCD
+        local spellID = ActionSpellID(action)
+        if not spellID or ns.IsSecret(spellID) then return false end
+        return ns.SpellLockedOnly(spellID, info)
     end
     return ns.SpellOnGCD(ActionSpellID(action))
 end
