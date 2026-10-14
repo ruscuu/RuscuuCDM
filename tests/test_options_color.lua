@@ -22,7 +22,7 @@ for _, f in ipairs(M.frames) do
         swatches[#swatches + 1] = f
     end
 end
-assert(#swatches == 10, "muestras de color: " .. #swatches)
+assert(#swatches == 17, "muestras de color: " .. #swatches)
 
 -- Normal: Aceptar guarda el color, Cancelar lo devuelve, y el selector se cierra
 local numberSwatch

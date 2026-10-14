@@ -37,4 +37,5 @@ Skin.lua
 ActiveCooldowns.lua
 Minimap.lua
 ActionBars.lua
+Threat.lua
 Options.lua

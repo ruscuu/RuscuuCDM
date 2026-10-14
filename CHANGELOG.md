@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.7.0
+
+**New**
+- **Threat meter on enemy nameplates**: above each enemy you are fighting, your threat as a bar, a percentage or both (100% means you would pull it), colored by the danger: low, about to pull it, pulled but barely, and attacking you. New **Threat** options page: what to show, width, height, position, every color, the number's size, color and place, and a 10-second test to adjust it out of combat. Needs enemy nameplates turned on (V key).
+
+**Fixed**
+- Shooting with a wand no longer makes every cooldown light up: the golden border on the Cooldown Manager and action buttons, and the active cooldowns bar, now ignore the short lock each wand shot puts on all spells (the game doesn't report it as the global cooldown). Real cooldowns keep showing while you shoot.
+- `/rcm debug` shows which spell is used to recognize that lock.
+
 ## v0.6.2
 
 **Fixed**

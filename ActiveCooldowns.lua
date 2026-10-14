@@ -1256,6 +1256,9 @@ function CaptureGCD(onlyNew)
             if not (onlyNew and onGCD[id] ~= nil) then ids[#ids + 1] = id end
         end
     end
+    -- Disparar con la varita bloquea todos los hechizos sin que el juego lo marque como GCD: mientras dura,
+    -- un hechizo que no se había visto ya en un cooldown real cuenta como GCD
+    local lock = ns.GlobalLock and ns.GlobalLock()
     for _, id in ipairs(ids) do
         local ok, info = GetCooldown(id)
         local active = ok and type(info) == "table" and PlainBool(info.isActive) and info.isActive
@@ -1263,7 +1266,11 @@ function CaptureGCD(onlyNew)
         if not active then
             latched[id] = nil
         elseif not onGCD[id] then
-            latched[id] = true
+            if lock and not latched[id] then
+                onGCD[id] = true
+            else
+                latched[id] = true
+            end
         end
     end
 end

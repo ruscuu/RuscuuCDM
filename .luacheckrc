@@ -23,15 +23,15 @@ read_globals = {
 
     -- Espacios de nombres C_*
     "C_ActionBar", "C_ClassColor", "C_Container", "C_Item", "C_CooldownViewer", "C_CurveUtil", "C_CVar", "C_DurationUtil",
-    "C_PetInfo", "C_SpecializationInfo", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras", "Enum",
+    "C_NamePlate", "C_PetInfo", "C_SpecializationInfo", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras", "Enum",
 
     -- Funciones
     "CreateColor", "CreateFont", "CreateFrame", "GetActionInfo", "GetBindingKey", "GetBindingText",
     "GetCursorPosition", "GetItemCooldown", "IsMounted", "IsResting", "UnitInVehicle", "GetFlyoutInfo", "GetFlyoutSlotInfo", "GetInventoryItemCooldown", "GetInventoryItemTexture", "GetLocale", "GetMinimapShape", "GetNumSpecializations", "GetPrimaryTalentTree",
-    "GetRealmName", "geterrorhandler", "GetSpecialization", "GetSpecializationInfo", "GetSpecializationInfoForClassID",
+    "GetRealmName", "geterrorhandler", "GetSpellBaseCooldown", "GetSpecialization", "GetSpecializationInfo", "GetSpecializationInfoForClassID",
     "GetTime", "HasAction", "hooksecurefunc", "InCombatLockdown", "IsLoggedIn", "IsPlayerSpell", "IsShiftKeyDown", "IsSpellKnown",
     "issecretvalue", "LibStub", "PlaySound", "ReloadUI", "SetCVar", "ShowUIPanel", "StaticPopup_Show",
-    "UnitAffectingCombat", "UnitClass", "UnitName",
+    "UnitAffectingCombat", "UnitCanAttack", "UnitDetailedThreatSituation", "UnitClass", "UnitName",
 
     -- Frames, objetos y constantes de Blizzard
     "ActionBarButtonEventsFrame", "ChatFontNormal", "ColorPickerFrame", "CooldownViewerSettings",
