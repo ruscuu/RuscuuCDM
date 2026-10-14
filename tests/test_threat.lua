@@ -117,6 +117,14 @@ assert(not m.bar:IsShown() and m.text:IsShown(), "solo el porcentaje")
 assert(m:GetWidth() == 150, "con el ancho elegido")
 local _, _, _, ox, oy = m:GetPoint(1)
 assert(ox == 10 and oy == 20, "en la posición elegida")
+-- El medidor que ya está en la placa cambia de tamaño al momento, aunque el juego no liste las placas visibles
+local getPlates = C_NamePlate.GetNamePlates
+C_NamePlate.GetNamePlates = function() return {} end
+ns.db.threatWidth, ns.db.threatHeight = 80, 12
+ns.RefreshThreat()
+assert(ns.GetThreatMeter("nameplate2") == m and m:GetWidth() == 80 and m:GetHeight() == 12,
+    "el ancho y el alto cambian en el medidor que ya se ve")
+C_NamePlate.GetNamePlates = getPlates
 ns.db.threatShow = "bar"
 ns.RefreshThreat()
 m = ns.GetThreatMeter("nameplate2")

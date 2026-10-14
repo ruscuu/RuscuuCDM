@@ -4,6 +4,7 @@
 
 **Fixed**
 - Threat meter: in combat the bar stayed purple ("hidden by the game") even when the enemy was attacking you. The game hides the threat level in combat, but the addon now passes it to a color curve, so the bar shows the right color (green, yellow, orange or red) without reading the value.
+- Threat meter: changing the width (and the other size, position and color options) now updates the meters already on screen right away.
 
 ## v0.7.0
 

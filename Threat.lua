@@ -37,7 +37,12 @@ end
 local function StyleMeter(meter)
     local db = ns.db
     local show = db.threatShow
-    meter:SetSize(db.threatWidth, db.threatHeight)
+    meter:SetWidth(db.threatWidth)
+    meter:SetHeight(db.threatHeight)
+    if meter.anchor then
+        meter:ClearAllPoints()
+        meter:SetPoint("BOTTOM", meter.anchor, "TOP", db.threatX, db.threatY)
+    end
     meter.bar:SetStatusBarTexture(ns.ResolveBarTexture(db.barTexture) or ns.WHITE)
     local bg = db.threatBgColor
     meter.bar.bg:SetColorTexture(bg[1], bg[2], bg[3], bg[4] or 1)
@@ -63,6 +68,7 @@ local function ReleaseMeter(unit)
     meter:Hide()
     meter:ClearAllPoints()
     meter:SetParent(UIParent)
+    meter.anchor = nil
     meters[unit] = nil
     spare[#spare + 1] = meter
 end
@@ -151,10 +157,9 @@ local function AddPlate(unit)
     local meter = NewMeter()
     meter:SetParent(plate)
     meter:SetFrameLevel((anchor:GetFrameLevel() or 0) + 5)
+    -- Encima del nombre, si la placa lo tiene; si no, encima de la placa
+    meter.anchor = anchor.name or anchor.Name or anchor
     StyleMeter(meter)
-    -- Encima del nombre, si la placa lo tiene; si no, encima de la placa. Desplazado lo que diga el jugador.
-    local name = anchor.name or anchor.Name
-    meter:SetPoint("BOTTOM", name or anchor, "TOP", ns.db.threatX, ns.db.threatY)
     meters[unit] = meter
     UpdateMeter(unit)
 end
@@ -169,11 +174,21 @@ local function VisiblePlates()
     return units
 end
 
+-- Al cambiar una opción: los medidores que ya están en las placas se rehacen en el sitio (tamaño, posición,
+-- colores) y se añaden los de las placas visibles que aún no tienen
 function ns.RefreshThreat()
     statusCurve = nil -- los colores pueden haber cambiado
-    for unit in pairs(meters) do ReleaseMeter(unit) end
-    if not (ns.db and ns.db.threatBar) then return end
-    for _, unit in ipairs(VisiblePlates()) do AddPlate(unit) end
+    if not (ns.db and ns.db.threatBar) then
+        for unit in pairs(meters) do ReleaseMeter(unit) end
+        return
+    end
+    for unit, meter in pairs(meters) do
+        StyleMeter(meter)
+        UpdateMeter(unit)
+    end
+    for _, unit in ipairs(VisiblePlates()) do
+        if not meters[unit] then AddPlate(unit) end
+    end
 end
 
 -- Vista previa: los enemigos con placa visible muestran un medidor de ejemplo durante unos segundos
