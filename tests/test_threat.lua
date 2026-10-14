@@ -31,6 +31,10 @@ local function plate(unit)
     return p
 end
 
+local function sameColor(got, want)
+    return got and got[1] == want[1] and got[2] == want[2] and got[3] == want[3]
+end
+
 local ns = {}
 M.Load(ns, "Locales.lua", "Core.lua", "Threat.lua")
 ns.db = ns.CopyTable(ns.PROFILE_DEFAULTS)
@@ -53,6 +57,36 @@ assert(bar.bar:GetValue() == 100, "se actualiza sola mientras dura el combate")
 threat.nameplate1 = { SECRET, SECRET }
 M.Tick(0.3)
 assert(bar:IsShown() and bar.bar:GetValue() == SECRET, "con valores secretos se sigue viendo")
+assert(sameColor(bar.bar._color, ns.db.threatColorSecret), "sin curva de color: el color de dato oculto")
+
+-- Con la curva de color del juego, el nivel secreto da su color sin que el addon lo lea:
+-- te está atacando (nivel 3) -> rojo, aunque el dato esté oculto
+local Hidden = function(v) return { __secret = true, value = v } end
+CreateColor = function(r, g, b, a) return { GetRGBA = function() return r, g, b, a end } end
+C_CurveUtil = { CreateColorCurve = function()
+    local curve = { points = {} }
+    function curve:AddPoint(x, color) self.points[#self.points + 1] = { x = x, c = color } end
+    function curve:Evaluate(x)
+        x = type(x) == "table" and x.value or x
+        local best
+        for _, p in ipairs(self.points) do
+            if not best or math.abs(p.x - x) < math.abs(best.x - x) then best = p end
+        end
+        return best.c
+    end
+    return curve
+end }
+ns.RefreshThreat()
+bar = ns.GetThreatMeter("nameplate1")
+threat.nameplate1 = { Hidden(3), SECRET }
+M.Tick(0.3)
+assert(sameColor(bar.bar._color, ns.db.threatColorTanking), "oculto pero te ataca: rojo")
+threat.nameplate1 = { Hidden(0), SECRET }
+M.Tick(0.3)
+assert(sameColor(bar.bar._color, ns.db.threatColorLow), "oculto y con poca amenaza: verde")
+threat.nameplate1 = { 1, 85 }
+M.Tick(0.3)
+assert(sameColor(bar.bar._color, ns.db.threatColorHigh), "dato visible: amarillo")
 
 -- Una placa amiga no lleva barra
 plate("nameplate3")

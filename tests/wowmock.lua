@@ -52,6 +52,7 @@ function Object:SetFontObject(font) self._hasFont = font ~= nil end
 function Object:GetText() return self._text end
 function Object:SetFont(file, size, flags) self._font = { file, size, flags }; self._hasFont = true; return true end
 function Object:GetFont() if self._font then return unpack(self._font) end return "Fonts\\FRIZQT__.TTF", 12, "" end
+function Object:SetStatusBarColor(r, g, b, a) self._color = { r, g, b, a } end
 function Object:SetVertexColor(r, g, b, a) self._vertex = { r, g, b, a } end
 function Object:SetAlpha(a) self._alpha = a end
 function Object:GetAlpha() return self._alpha or 1 end
