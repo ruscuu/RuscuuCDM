@@ -37,7 +37,12 @@ end
 local function StyleMeter(meter)
     local db = ns.db
     local show = db.threatShow
-    meter:SetSize(db.threatWidth, db.threatHeight)
+    meter:SetWidth(db.threatWidth)
+    meter:SetHeight(db.threatHeight)
+    if meter.anchor then
+        meter:ClearAllPoints()
+        meter:SetPoint("BOTTOM", meter.anchor, "TOP", db.threatX, db.threatY)
+    end
     meter.bar:SetStatusBarTexture(ns.ResolveBarTexture(db.barTexture) or ns.WHITE)
     local bg = db.threatBgColor
     meter.bar.bg:SetColorTexture(bg[1], bg[2], bg[3], bg[4] or 1)
@@ -63,6 +68,7 @@ local function ReleaseMeter(unit)
     meter:Hide()
     meter:ClearAllPoints()
     meter:SetParent(UIParent)
+    meter.anchor = nil
     meters[unit] = nil
     spare[#spare + 1] = meter
 end
@@ -77,6 +83,42 @@ local function Threat(unit)
     return status, scaledPercent
 end
 
+-- En combate el juego oculta el nivel de amenaza (valor secreto): no se puede mirar, pero sí pasárselo a una
+-- curva de color, que devuelve el color de ese nivel sin que el addon lo vea. Los niveles son 0, 1, 2 y 3: cada
+-- uno tiene su color en un tramo plano de la curva.
+local statusCurve
+local function BuildStatusCurve()
+    statusCurve = nil
+    if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return end
+    local ok, curve = pcall(C_CurveUtil.CreateColorCurve)
+    if not ok or not curve then return end
+    for level = 0, 3 do
+        local c = ns.db[STATUS_KEYS[level]]
+        local color = CreateColor(c[1], c[2], c[3], c[4] or 1)
+        curve:AddPoint(math.max(0, level - 0.45), color)
+        curve:AddPoint(level + 0.45, color)
+    end
+    statusCurve = curve
+end
+
+local function StatusColor(status)
+    local db = ns.db
+    if Plain(status) then
+        local c = db[STATUS_KEYS[status] or "threatColorSecret"]
+        return c[1], c[2], c[3], c[4] or 1
+    end
+    if not statusCurve then BuildStatusCurve() end
+    if statusCurve then
+        local ok, color = pcall(statusCurve.Evaluate, statusCurve, status)
+        if ok and color then
+            local okRGBA, r, g, b, a = pcall(color.GetRGBA, color)
+            if okRGBA then return r, g, b, a end
+        end
+    end
+    local c = db.threatColorSecret
+    return c[1], c[2], c[3], c[4] or 1
+end
+
 local function UpdateMeter(unit)
     local meter = meters[unit]
     if not meter then return end
@@ -86,9 +128,12 @@ local function UpdateMeter(unit)
         meter:Hide()
         return
     end
-    local color = db[Plain(status) and STATUS_KEYS[status] or "threatColorSecret"] or db.threatColorSecret
-    meter.bar:SetStatusBarColor(color[1], color[2], color[3], color[4] or 1)
-    if db.threatTextUseColor then meter.text:SetTextColor(color[1], color[2], color[3], 1) end
+    local r, g, b, a = StatusColor(status)
+    if not pcall(meter.bar.SetStatusBarColor, meter.bar, r, g, b, a) then
+        local c = db.threatColorSecret
+        meter.bar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
+    end
+    if db.threatTextUseColor then pcall(meter.text.SetTextColor, meter.text, r, g, b, 1) end
     -- Las barras y los textos aceptan los valores secretos tal cual: el addon nunca los lee
     local hasPercent = ns.IsSecret(percent) or percent ~= nil
     if not (hasPercent and pcall(meter.bar.SetValue, meter.bar, percent)) then meter.bar:SetValue(0) end
@@ -112,10 +157,9 @@ local function AddPlate(unit)
     local meter = NewMeter()
     meter:SetParent(plate)
     meter:SetFrameLevel((anchor:GetFrameLevel() or 0) + 5)
+    -- Encima del nombre, si la placa lo tiene; si no, encima de la placa
+    meter.anchor = anchor.name or anchor.Name or anchor
     StyleMeter(meter)
-    -- Encima del nombre, si la placa lo tiene; si no, encima de la placa. Desplazado lo que diga el jugador.
-    local name = anchor.name or anchor.Name
-    meter:SetPoint("BOTTOM", name or anchor, "TOP", ns.db.threatX, ns.db.threatY)
     meters[unit] = meter
     UpdateMeter(unit)
 end
@@ -130,10 +174,21 @@ local function VisiblePlates()
     return units
 end
 
+-- Al cambiar una opción: los medidores que ya están en las placas se rehacen en el sitio (tamaño, posición,
+-- colores) y se añaden los de las placas visibles que aún no tienen
 function ns.RefreshThreat()
-    for unit in pairs(meters) do ReleaseMeter(unit) end
-    if not (ns.db and ns.db.threatBar) then return end
-    for _, unit in ipairs(VisiblePlates()) do AddPlate(unit) end
+    statusCurve = nil -- los colores pueden haber cambiado
+    if not (ns.db and ns.db.threatBar) then
+        for unit in pairs(meters) do ReleaseMeter(unit) end
+        return
+    end
+    for unit, meter in pairs(meters) do
+        StyleMeter(meter)
+        UpdateMeter(unit)
+    end
+    for _, unit in ipairs(VisiblePlates()) do
+        if not meters[unit] then AddPlate(unit) end
+    end
 end
 
 -- Vista previa: los enemigos con placa visible muestran un medidor de ejemplo durante unos segundos
