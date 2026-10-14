@@ -79,6 +79,10 @@ L["Buffs about to end: aura API %s"] = "Améliorations sur le point d’expirer 
 L["Active cooldowns: cooldown state %s"] = "Temps de recharge actifs : état du temps de recharge %s"
 L["%d in the bar"] = "%d dans la barre"
 L["Active profile: %s"] = "Profil actif : %s"
+L["Threat on enemy nameplates"] = "Menace sur les barres d'info ennemies"
+L["Threat meter above enemies"] = "Jauge de menace au-dessus des ennemis"
+L["Show the percentage"] = "Afficher le pourcentage"
+L["A thin bar above the nameplate of each enemy you are fighting: it fills with your threat (100% means you would pull it) and turns yellow, orange and red as you get close to pulling it or it attacks you. Needs enemy nameplates turned on (V key)."] = "Une fine barre au-dessus de la barre d'info de chaque ennemi que vous combattez : elle se remplit avec votre menace (100% signifie que vous le prendriez) et devient jaune, orange puis rouge quand vous êtes sur le point de le prendre ou qu'il vous attaque. Les barres d'info ennemies doivent être activées (touche V)."
 L["Wand lock: reference spell %s, active now %s"] = "Baguette : sort de référence %s, blocage en cours %s"
 L["none"] = "aucun"
 

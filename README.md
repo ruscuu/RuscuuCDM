@@ -13,6 +13,7 @@ It only changes how things look — it never reads combat data, so it follows Fo
 - **Keybinds on Cooldown Manager icons**: the key that casts each spell, taken from your action bars.
 - **Golden border** during the last seconds of a cooldown, on action buttons and Cooldown Manager icons: seconds, color, thickness, glow and blink style/speed — and you choose which spells get it.
 - **Border when a buff is about to end**, on the Cooldown Manager's buff icons and bars.
+- **Threat meter on enemy nameplates**: a thin bar above each enemy you fight that fills with your threat and turns yellow, orange and red as you get close to pulling it.
 - **Choose which cooldowns are shown** through Blizzard's own Advanced Cooldown Settings, one click away.
 - **Cooldown numbers** on the Cooldown Manager and action bars: font, size, outline and color for every text.
 - Works with **Bartender4, Dominos and ElvUI** action bars.
@@ -50,6 +51,7 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 - **Atajos de teclado en los iconos del Cooldown Manager**: la tecla que lanza cada hechizo, según tus barras de acción.
 - **Borde dorado** en los últimos segundos de un cooldown, en los botones de acción y en los iconos del Cooldown Manager: segundos, color, grosor, resplandor y tipo/velocidad de parpadeo; y eliges a qué hechizos se aplica.
 - **Borde cuando un buff va a terminar**, en los iconos y barras de buffs del Cooldown Manager.
+- **Medidor de amenaza en las placas de enemigos**: una barra fina encima de cada enemigo con el que luchas que se llena con tu amenaza y se pone amarilla, naranja y roja cuando estás a punto de quitarle el objetivo al tanque.
 - **Elige qué cooldowns se muestran** desde el panel de Ajustes avanzados de habilidades de Blizzard, a un clic.
 - **Números de cooldown** en el Cooldown Manager y en las barras de acción: fuente, tamaño, contorno y color de cada texto.
 - Funciona con las barras de **Bartender4, Dominos y ElvUI**.

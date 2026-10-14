@@ -79,6 +79,10 @@ L["Buffs about to end: aura API %s"] = "Buffs a punto de terminar: API de auras 
 L["Active cooldowns: cooldown state %s"] = "Cooldowns activos: estado del cooldown %s"
 L["%d in the bar"] = "%d en la barra"
 L["Active profile: %s"] = "Perfil activo: %s"
+L["Threat on enemy nameplates"] = "Amenaza en las placas de enemigos"
+L["Threat meter above enemies"] = "Medidor de amenaza sobre los enemigos"
+L["Show the percentage"] = "Mostrar el porcentaje"
+L["A thin bar above the nameplate of each enemy you are fighting: it fills with your threat (100% means you would pull it) and turns yellow, orange and red as you get close to pulling it or it attacks you. Needs enemy nameplates turned on (V key)."] = "Una barra fina encima de la placa de nombre de cada enemigo con el que luchas: se llena con tu amenaza (100% es cuando le quitarías el objetivo) y se pone amarilla, naranja y roja cuando estás a punto de quitárselo o te ataca a ti. Necesita las placas de enemigos activadas (tecla V)."
 L["Wand lock: reference spell %s, active now %s"] = "Varita: hechizo de referencia %s, bloqueo ahora %s"
 L["none"] = "ninguno"
 

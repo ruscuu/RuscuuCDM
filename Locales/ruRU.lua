@@ -79,6 +79,10 @@ L["Buffs about to end: aura API %s"] = "Заканчивающиеся бафф�
 L["Active cooldowns: cooldown state %s"] = "Активные восстановления: состояние восстановления %s"
 L["%d in the bar"] = "%d на панели"
 L["Active profile: %s"] = "Активный профиль: %s"
+L["Threat on enemy nameplates"] = "Угроза на табличках врагов"
+L["Threat meter above enemies"] = "Шкала угрозы над врагами"
+L["Show the percentage"] = "Показывать процент"
+L["A thin bar above the nameplate of each enemy you are fighting: it fills with your threat (100% means you would pull it) and turns yellow, orange and red as you get close to pulling it or it attacks you. Needs enemy nameplates turned on (V key)."] = "Тонкая полоса над табличкой каждого врага, с которым вы сражаетесь: она заполняется вашей угрозой (100% — вы сорвёте агро) и становится жёлтой, оранжевой и красной, когда вы близки к этому или враг атакует вас. Нужны включённые таблички врагов (клавиша V)."
 L["Wand lock: reference spell %s, active now %s"] = "Жезл: опорное заклинание %s, блокировка сейчас %s"
 L["none"] = "нет"
 

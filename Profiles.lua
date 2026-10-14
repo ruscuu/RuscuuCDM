@@ -89,6 +89,7 @@ function ns.RefreshAll()
     ns.UpdateExpire()
     ns.SkinAll()
     ns.StyleActionBars()
+    if ns.RefreshThreat then ns.RefreshThreat() end
     if ns.RefreshOptions then ns.RefreshOptions() end
 end
 

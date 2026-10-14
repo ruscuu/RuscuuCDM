@@ -605,6 +605,13 @@ local function BuildGeneral(ui)
     end)
     ui:Next(100)
 
+    ui:Section(L["Threat on enemy nameplates"])
+    ui:DBCheck(1, L["Threat meter above enemies"], "threatBar",
+        L["A thin bar above the nameplate of each enemy you are fighting: it fills with your threat (100% means you would pull it) and turns yellow, orange and red as you get close to pulling it or it attacks you. Needs enemy nameplates turned on (V key)."],
+        function() ns.RefreshThreat() end)
+    ui:DBCheck(2, L["Show the percentage"], "threatPercent", nil, function() ns.RefreshThreat() end)
+    ui:Next(30)
+
     ui:Section(L["Addon"])
     ui:Check(1, L["Show minimap button"],
         function() return not ns.global.minimap.hide end,

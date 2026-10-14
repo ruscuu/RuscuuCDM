@@ -204,6 +204,10 @@ ns.PROFILE_DEFAULTS = {
         bar5 = true, bar6 = true, bar7 = true, pet = true, stance = true, addons = true,
     },
 
+    -- Medidor de amenaza encima de las placas de nombre de los enemigos
+    threatBar = true,
+    threatPercent = true,                     -- el porcentaje al lado de la barra
+
     -- Borde dorado cuando un cooldown está terminando
     expireGlow = true,
     expireOnCDM = true,
