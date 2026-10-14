@@ -206,7 +206,21 @@ ns.PROFILE_DEFAULTS = {
 
     -- Medidor de amenaza encima de las placas de nombre de los enemigos
     threatBar = true,
-    threatPercent = true,                     -- el porcentaje al lado de la barra
+    threatShow = "both",                      -- bar | percent | both
+    threatWidth = 110,
+    threatHeight = 6,
+    threatX = 0,                              -- desplazamiento desde el nombre de la placa
+    threatY = 2,
+    threatFontSize = 10,
+    threatTextPosition = "right",             -- left | center | right (con la barra)
+    threatTextColor = { 0.95, 0.91, 0.84, 1 },
+    threatTextUseColor = false,               -- el texto con el color de la amenaza
+    threatColorLow = { 0.3, 0.8, 0.3, 1 },    -- poca amenaza
+    threatColorHigh = { 1, 0.85, 0.1, 1 },    -- a punto de quitarle el objetivo al tanque
+    threatColorInsecure = { 1, 0.5, 0.1, 1 }, -- lo tienes, pero por poco
+    threatColorTanking = { 0.95, 0.15, 0.15, 1 }, -- te está atacando a ti
+    threatColorSecret = { 0.61, 0.3, 1, 1 },  -- el juego oculta el dato
+    threatBgColor = { 0, 0, 0, 0.6 },
 
     -- Borde dorado cuando un cooldown está terminando
     expireGlow = true,
@@ -248,6 +262,11 @@ ns.LIMITS = {
     activeSpacing = { 0, 20 },
     activeX = { -1500, 1500 },
     activeY = { -1500, 1500 },
+    threatWidth = { 30, 250 },
+    threatHeight = { 2, 30 },
+    threatX = { -150, 150 },
+    threatY = { -100, 100 },
+    threatFontSize = { 6, 30 },
 }
 
 -- Valores permitidos para las opciones de lista (los usa la importación)
@@ -260,6 +279,8 @@ ns.CHOICES = {
     keybindOutline = { NONE = true, OUTLINE = true, THICKOUTLINE = true, MONOCHROME = true },
     keybindAnchor = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true },
     expirePulse = { none = true, pulse = true, flash = true },
+    threatShow = { bar = true, percent = true, both = true },
+    threatTextPosition = { left = true, center = true, right = true },
     activeShow = { blizzard = true, always = true, combat = true, hidden = true },
     activeAnchor = { essential = true, screen = true },
     activeSoundChoice = { ready = true, warning = true, alarm = true, ping = true },

@@ -90,6 +90,22 @@ local function OutlineOptions()
     return list
 end
 
+local function ThreatShowOptions()
+    return {
+        { value = "both", text = L["Bar and percentage"] },
+        { value = "bar", text = L["Only the bar"] },
+        { value = "percent", text = L["Only the percentage"] },
+    }
+end
+
+local function ThreatTextOptions()
+    return {
+        { value = "right", text = L["Right of the bar"] },
+        { value = "center", text = L["On the bar"] },
+        { value = "left", text = L["Left of the bar"] },
+    }
+end
+
 local function ActiveShowOptions()
     return {
         { value = "blizzard", text = L["Like the essential cooldowns"] },
@@ -605,13 +621,6 @@ local function BuildGeneral(ui)
     end)
     ui:Next(100)
 
-    ui:Section(L["Threat on enemy nameplates"])
-    ui:DBCheck(1, L["Threat meter above enemies"], "threatBar",
-        L["A thin bar above the nameplate of each enemy you are fighting: it fills with your threat (100% means you would pull it) and turns yellow, orange and red as you get close to pulling it or it attacks you. Needs enemy nameplates turned on (V key)."],
-        function() ns.RefreshThreat() end)
-    ui:DBCheck(2, L["Show the percentage"], "threatPercent", nil, function() ns.RefreshThreat() end)
-    ui:Next(30)
-
     ui:Section(L["Addon"])
     ui:Check(1, L["Show minimap button"],
         function() return not ns.global.minimap.hide end,
@@ -855,6 +864,62 @@ local function BuildGoldenBorder(ui)
     ui:Slider(1, L["Last seconds of the buff"], "buffEndSeconds", 0.5, FormatSeconds, nil,
         L["The border appears when this many seconds (or fewer) of the buff remain."])
     ui:Next(48)
+end
+
+------------------------------------------------------------------------
+-- Página Amenaza
+------------------------------------------------------------------------
+
+local function RefreshThreat()
+    ns.RefreshThreat()
+end
+
+local function BuildThreat(ui)
+    ui:Button(1, L["Test for 10 seconds"], 200, function() ns.PreviewThreat(10) end,
+        L["Shows a sample meter on the enemies whose nameplates you can see, so you can adjust it out of combat."])
+    local _, h = ui:Note(L["Needs enemy nameplates turned on (V key)."], 2)
+    ui:Next(math.max(32, h))
+
+    ui:Section(L["General"])
+    ui:DBCheck(1, L["Threat meter above enemies"], "threatBar",
+        L["Above the nameplate of each enemy you are fighting: your threat as a bar, a percentage or both (100% means you would pull it), colored by how close you are to pulling it."],
+        RefreshThreat)
+    ui:Next(30)
+    ui:DBChoice(1, L["Show"], "threatShow", ThreatShowOptions, nil, RefreshThreat)
+    ui:DBChoice(2, L["Percentage position"], "threatTextPosition", ThreatTextOptions,
+        L["Where the percentage goes when the bar is shown too."], RefreshThreat)
+    ui:Next(56)
+
+    ui:Section(L["Size and position"])
+    ui:Slider(1, L["Width"], "threatWidth", 1, FormatPixels, RefreshThreat)
+    ui:Slider(2, L["Height"], "threatHeight", 1, FormatPixels, RefreshThreat)
+    ui:Next(48)
+    ui:Slider(1, L["Horizontal position"], "threatX", 1, FormatNumber, RefreshThreat,
+        L["Distance from the enemy's name."])
+    ui:Slider(2, L["Vertical position"], "threatY", 1, FormatNumber, RefreshThreat,
+        L["Distance from the enemy's name."])
+    ui:Next(48)
+
+    ui:Section(L["Colors"])
+    ui:Color(1, L["Low threat"], "threatColorLow", RefreshThreat)
+    ui:Color(2, L["About to pull it"], "threatColorHigh", RefreshThreat,
+        L["You have more threat than the tank, but it is still attacking them."])
+    ui:Next(30)
+    ui:Color(1, L["Pulled, but barely"], "threatColorInsecure", RefreshThreat,
+        L["It is attacking you, but someone is about to take it back."])
+    ui:Color(2, L["Attacking you"], "threatColorTanking", RefreshThreat)
+    ui:Next(30)
+    ui:Color(1, L["Hidden by the game"], "threatColorSecret", RefreshThreat,
+        L["When the game hides how much threat you have, the meter still fills but can't tell the danger: it uses this color."])
+    ui:Color(2, L["Bar background"], "threatBgColor", RefreshThreat)
+    ui:Next(30)
+
+    ui:Section(L["Percentage"])
+    ui:Slider(1, L["Number size"], "threatFontSize", 1, FormatNumber, RefreshThreat)
+    ui:Next(48)
+    ui:Color(1, L["Number color"], "threatTextColor", RefreshThreat)
+    ui:DBCheck(2, L["Same color as the threat"], "threatTextUseColor", nil, RefreshThreat)
+    ui:Next(30)
 end
 
 ------------------------------------------------------------------------
@@ -1557,6 +1622,13 @@ local SUBPAGES = {
         key = "spells", titleKey = "Golden border: spells", descKey = "Choose which spells get the golden border.",
         build = BuildSpells,
         resetKeys = { "expireExclude" },
+    },
+    {
+        key = "threat", titleKey = "Threat", descKey = "Your threat above enemy nameplates.",
+        build = BuildThreat,
+        resetKeys = { "threatBar", "threatShow", "threatWidth", "threatHeight", "threatX", "threatY", "threatFontSize",
+            "threatTextPosition", "threatTextColor", "threatTextUseColor", "threatColorLow", "threatColorHigh",
+            "threatColorInsecure", "threatColorTanking", "threatColorSecret", "threatBgColor" },
     },
     {
         key = "profiles", titleKey = "Profiles & Themes", descKey = "Themes, profiles per specialization and import/export.",
