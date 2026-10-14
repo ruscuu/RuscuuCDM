@@ -6,7 +6,8 @@ local M, ns = require("addon_env")("esES")
 -- Datos de una versión anterior: el druida eligió hechizos en Default (100 es suyo, 555 de otra clase)
 RuscuuCDMDB = {
     profiles = { Default = { activeAdd = { [100] = true, [555] = true }, activeOrder = { "spell555", "spell100", "item5" },
-        activeSound = { spell555 = true, spell100 = true }, activeItems = { [5] = true }, iconZoom = 0.2 } },
+        activeSound = { spell555 = true, spell100 = true }, activeItems = { [5] = true }, iconZoom = 0.2,
+        activeAuraBuffs = { [900] = true } } },
     chars = { ["Alma-Reino"] = { specs = { [2] = "Default" } } },
 }
 local knownSpells = { [100] = true }
@@ -25,13 +26,16 @@ assert(ns.db.activeAdd[100] and not ns.db.activeAdd[555], "solo los hechizos que
 assert(table.concat(ns.db.activeOrder, " ") == "spell100 item5", "orden: " .. table.concat(ns.db.activeOrder, " "))
 assert(ns.db.activeSound.spell100 and not ns.db.activeSound.spell555, "sonidos solo de sus hechizos")
 assert(ns.db.activeItems[5], "los objetos se conservan")
+assert(next(ns.db.activeAuraBuffs) == nil, "los beneficios elegidos con otra clase no se copian")
 assert(ns.global.profiles.Default.activeAdd[555], "Default no se toca")
+assert(ns.global.profiles.Default.activeAuraBuffs[900], "Default conserva sus beneficios")
 
 -- Aunque un perfil se comparta a propósito, un hechizo que el personaje no conoce no sale en la barra
 ns.SetProfile("Default")
 local keys = {}
 for _, e in ipairs(ns.GetActiveEntryList()) do keys[#keys + 1] = e.key end
-assert(table.concat(keys, " ") == "spell100 item5", "barra con Default: " .. table.concat(keys, " "))
+-- (los beneficios elegidos se quedan: solo salen si el personaje los tiene)
+assert(table.concat(keys, " ") == "spell100 item5 buff900", "barra con Default: " .. table.concat(keys, " "))
 -- Elegir Default a mano después de la migración se respeta
 ns.ChooseProfile("Default")
 assert(ns.ProfileForSpec(2) == "Default", "Default elegido a mano")

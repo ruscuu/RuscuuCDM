@@ -83,6 +83,7 @@ function Object:HookScript(name, fn)
 end
 function Object:Fire(name, ...) local fn = self._scripts and self._scripts[name]; if fn then return fn(self, ...) end end
 function Object:RegisterEvent(e) self._events = self._events or {}; self._events[e] = true end
+function Object:RegisterUnitEvent(e) self:RegisterEvent(e) end -- las pruebas lanzan el evento con su unidad
 function Object:GetChildren() return unpack(self._children or {}) end
 function Object:GetRegions() return unpack(self._regions or {}) end
 function Object:CreateTexture() return M.NewRegion("Texture", self) end

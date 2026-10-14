@@ -10,6 +10,7 @@ It only changes how things look — it never reads combat data, so it follows Fo
 
 - Ruscuu style for the four Cooldown Manager viewers (essential, utility, buff icons, buff bars): square icons, icon crop, borders (custom or class color), swipe color, swipe edge, finish flash, bar texture and colors (custom or class color).
 - **Active cooldowns bar**: only the cooldowns that are running, in one centered line together with the active buffs (icons and bars), with a flash and an optional sound when each one ends. Choose any spell (spellbook, pet, by ID or name), your trinkets and any item, their order, the icon size and spacing, and where the bar goes (drag it or set its position). Test it for 10 seconds from the options.
+- **Buffs and debuffs of your choice** in the active cooldowns bar: talent procs and other buffs on you, and the debuffs you put on your target, with their time left and stacks, a flash and an optional sound when they appear.
 - **Keybinds on Cooldown Manager icons**: the key that casts each spell, taken from your action bars.
 - **Golden border** during the last seconds of a cooldown, on action buttons and Cooldown Manager icons: seconds, color, thickness, glow and blink style/speed — and you choose which spells get it.
 - **Border when a buff is about to end**, on the Cooldown Manager's buff icons and bars.
@@ -47,6 +48,7 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 
 - Estilo Ruscuu para los cuatro visores del Cooldown Manager (esenciales, utilidad, buffs en iconos y en barras): iconos cuadrados, recorte, bordes (color propio o de clase), color del barrido, línea del barrido, destello al terminar, textura y colores de las barras (color propio o de clase).
 - **Barra de cooldowns activos**: solo los cooldowns que están en marcha, en una línea centrada junto a los buffs activos (iconos y barras), con un destello y un sonido opcional cuando termina cada uno. Elige cualquier hechizo (del libro, de la mascota, por número o nombre), tus abalorios y cualquier objeto, su orden, el tamaño y la separación de los iconos, y dónde va la barra (arrástrala o pon su posición). Pruébala 10 segundos desde las opciones.
+- **Beneficios y perjuicios que elijas** en la barra de cooldowns activos: procs de talentos y otros beneficios en ti, y los perjuicios que pones en tu objetivo, con su tiempo restante y sus acumulaciones, un destello y un sonido opcional al aparecer.
 - **Atajos de teclado en los iconos del Cooldown Manager**: la tecla que lanza cada hechizo, según tus barras de acción.
 - **Borde dorado** en los últimos segundos de un cooldown, en los botones de acción y en los iconos del Cooldown Manager: segundos, color, grosor, resplandor y tipo/velocidad de parpadeo; y eliges a qué hechizos se aplica.
 - **Borde cuando un buff va a terminar**, en los iconos y barras de buffs del Cooldown Manager.

@@ -168,6 +168,8 @@ ns.PROFILE_DEFAULTS = {
     activeRemove = {},                        -- [spellID] = true: hechizos del Cooldown Manager quitados
     activeTrinket1 = false,                   -- abalorio de arriba (hueco 13)
     activeTrinket2 = false,                   -- abalorio de abajo (hueco 14)
+    activeAuraBuffs = {},                     -- [spellID] = true: beneficios del personaje en la barra (procs...)
+    activeAuraDebuffs = {},                   -- [spellID] = true: perjuicios que el personaje pone en su objetivo
 
     -- Barras de buffs
     barTexture = "flat",
@@ -619,6 +621,7 @@ function ns.GetStatus()
         auraAPI = ns.HasAuraDurationAPI(),
         activeAPI = ns.ActiveCooldownAPI(),
         activeEntries = ns.CountActiveEntries(),
+        aurasHidden = ns.ActiveAurasHidden(),
     }
 end
 
@@ -638,5 +641,6 @@ function ns.Debug()
     ns.Print(L["Buffs about to end: aura API %s"]:format(s.auraAPI and yes or no), true)
     ns.Print(L["Active cooldowns: cooldown state %s"]:format(s.activeAPI == nil and "?" or (s.activeAPI and yes or no))
         .. " · " .. L["%d in the bar"]:format(s.activeEntries), true)
+    ns.Print(L["Buffs and debuffs in the bar: hidden by the game %s"]:format(s.aurasHidden and yes or no), true)
     ns.Print(L["Active profile: %s"]:format(ns.activeProfile), true)
 end

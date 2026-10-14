@@ -40,6 +40,8 @@ local function CopyForClass(source)
             end
         end
     end
+    -- Los beneficios y perjuicios elegidos son de la clase del perfil original: la copia empieza sin ellos
+    copy.activeAuraBuffs, copy.activeAuraDebuffs = {}, {}
     local function keepKey(key)
         local id = type(key) == "string" and tonumber(key:match("^spell(%d+)$"))
         return not id or knows(id) ~= false
@@ -318,7 +320,8 @@ end
 
 local PREFIX = "!RUSCUU:1!"
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local SPELL_SET_KEYS = { expireExclude = true, activeAdd = true, activeRemove = true, activeItems = true }
+local SPELL_SET_KEYS = { expireExclude = true, activeAdd = true, activeRemove = true, activeItems = true,
+    activeAuraBuffs = true, activeAuraDebuffs = true }
 -- Claves de texto: una lista con orden ("a,b,c") o un conjunto ([clave] = true)
 local KEY_LISTS = { activeOrder = "list", activeSound = "set" } -- conjuntos de hechizos: se exportan como "123,456"
 
