@@ -9,7 +9,9 @@ local threat = {}
 UnitDetailedThreatSituation = function(_, unit)
     local t = threat[unit]
     if not t then return nil end
-    return t[1] == 3, t[1], t[2], t[2], 0
+    local tanking = t[3]
+    if tanking == nil then tanking = t[1] == 3 end
+    return tanking, t[1], t[2], t[2], 0
 end
 local hostile = { nameplate1 = true, nameplate2 = true, nameplate3 = false }
 UnitCanAttack = function(_, unit) return hostile[unit] end
@@ -54,7 +56,7 @@ M.Tick(0.3)
 assert(bar.bar:GetValue() == 100, "se actualiza sola mientras dura el combate")
 
 -- Datos ocultos por el juego: la barra recibe el valor tal cual, sin que el addon lo lea
-threat.nameplate1 = { SECRET, SECRET }
+threat.nameplate1 = { SECRET, SECRET, SECRET }
 M.Tick(0.3)
 assert(bar:IsShown() and bar.bar:GetValue() == SECRET, "con valores secretos se sigue viendo")
 assert(sameColor(bar.bar._color, ns.db.threatColorSecret), "sin curva de color: el color de dato oculto")
@@ -87,6 +89,35 @@ assert(sameColor(bar.bar._color, ns.db.threatColorLow), "oculto y con poca amena
 threat.nameplate1 = { 1, 85 }
 M.Tick(0.3)
 assert(sameColor(bar.bar._color, ns.db.threatColorHigh), "dato visible: amarillo")
+
+-- Si la curva no acepta el nivel oculto: se usa "te ataca a ti" (también oculto) con la función de color por
+-- verdadero/falso del juego, sin mirarlo
+local evaluate = C_CurveUtil.CreateColorCurve
+C_CurveUtil.CreateColorCurve = function()
+    local curve = evaluate()
+    curve.Evaluate = function() error("valor secreto no permitido") end
+    return curve
+end
+C_CurveUtil.EvaluateColorFromBoolean = function(b, yes, no) return b.value and yes or no end
+ns.RefreshThreat()
+threat.nameplate1 = { Hidden(3), SECRET, Hidden(true) }
+M.Tick(0.3)
+assert(sameColor(bar.bar._color, ns.db.threatColorTanking), "sin curva, pero te ataca: rojo")
+assert(ns.GetThreatColorInfo().source == "tanking", "color sacado de si te ataca")
+threat.nameplate1 = { Hidden(0), SECRET, Hidden(false) }
+M.Tick(0.3)
+assert(sameColor(bar.bar._color, ns.db.threatColorLow), "sin curva y no te ataca: poca amenaza")
+
+-- Sin nada de eso: si el enemigo te tiene de objetivo, te está atacando
+C_CurveUtil.EvaluateColorFromBoolean = nil
+UnitIsUnit = function(a, b) return a == "nameplate1target" and b == "player" end
+threat.nameplate1 = { Hidden(3), SECRET, Hidden(true) }
+M.Tick(0.3)
+assert(sameColor(bar.bar._color, ns.db.threatColorTanking), "por su objetivo: rojo")
+assert(ns.GetThreatColorInfo().source == "target", "color sacado del objetivo del enemigo")
+UnitIsUnit = nil
+C_CurveUtil.CreateColorCurve = evaluate
+ns.RefreshThreat()
 
 -- Una placa amiga no lleva barra
 plate("nameplate3")

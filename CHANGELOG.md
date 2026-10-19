@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.2
+
+**Fixed**
+- Threat meter: the bar could still stay purple in combat when an enemy was attacking you. The color is now painted on the bar's texture (which accepts the values the game hides), and if the threat level can't be used it falls back to whether the enemy is attacking you (red) or not.
+- `/rcm debug` shows whether the game hides the threat level and where the bar's color came from.
+
 ## v0.7.1
 
 **Fixed**
