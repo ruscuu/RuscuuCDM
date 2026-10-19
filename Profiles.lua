@@ -362,6 +362,9 @@ local function Decode(text)
     return table.concat(out)
 end
 
+-- También las usan las instantáneas de la interfaz (Snapshots.lua)
+ns.Base64Encode, ns.Base64Decode = Encode, Decode
+
 local function IsColor(value)
     return type(value) == "table" and value[1] ~= nil
 end

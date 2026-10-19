@@ -32,6 +32,13 @@ read_globals = {
     "GetTime", "HasAction", "hooksecurefunc", "InCombatLockdown", "IsLoggedIn", "IsPlayerSpell", "IsShiftKeyDown", "IsSpellKnown",
     "issecretvalue", "LibStub", "PlaySound", "ReloadUI", "SetCVar", "ShowUIPanel", "StaticPopup_Show",
     "UnitAffectingCombat", "UnitCanAttack", "UnitDetailedThreatSituation", "UnitIsUnit", "UnitClass", "UnitName",
+    "date", "time",
+
+    -- Instantáneas de la interfaz (Modo Edición, teclas, barras de acción y macros)
+    "C_EditMode", "C_EquipmentSet", "C_MountJournal", "C_PetJournal", "C_ToyBox", "EditModePresetLayoutManager",
+    "ClearCursor", "CreateMacro", "GetActionText", "GetBinding", "GetCurrentBindingSet", "GetCursorInfo",
+    "GetMacroIndexByName", "GetMacroInfo", "GetNumBindings", "PickupAction", "PickupItem", "PickupMacro",
+    "PickupSpell", "PlaceAction", "PlayerHasToy", "SaveBindings", "SetBinding",
 
     -- Frames, objetos y constantes de Blizzard
     "ActionBarButtonEventsFrame", "ChatFontNormal", "ColorPickerFrame", "CooldownViewerSettings",

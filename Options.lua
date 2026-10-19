@@ -1575,6 +1575,227 @@ local function BuildProfiles(ui)
 end
 
 ------------------------------------------------------------------------
+-- Página Interfaz: instantáneas de posiciones, teclas y barras de acción
+------------------------------------------------------------------------
+
+local selectedSnapshot
+
+local function SnapshotOptions()
+    local list = {}
+    for _, name in ipairs(ns.GetSnapshotNames()) do list[#list + 1] = { value = name, text = name } end
+    return list
+end
+
+local function CurrentSnapshot()
+    if not ns.GetSnapshot(selectedSnapshot) then selectedSnapshot = ns.GetSnapshotNames()[1] end
+    return selectedSnapshot
+end
+
+local function SnapshotInfo(name)
+    local snap = ns.GetSnapshot(name)
+    if not snap then return L["No snapshots yet: write a name and press Save."] end
+    local keys, buttons = ns.SnapshotCounts(snap)
+    local lines = {}
+    if snap.character then
+        local who = snap.character .. (snap.spec and (" · " .. snap.spec) or "")
+        if snap.time and date then who = who .. " · " .. date("%Y-%m-%d %H:%M", snap.time) end
+        lines[#lines + 1] = L["Saved by %s"]:format(who)
+    end
+    lines[#lines + 1] = L["Positions: %s"]:format(snap.layout and (snap.layoutName or L["yes"]) or L["no"])
+    lines[#lines + 1] = L["%d keybindings, %d action buttons"]:format(keys, buttons)
+    return table.concat(lines, "\n")
+end
+
+-- Escribe en el chat lo que se restauró y lo que no
+local function PrintRestoreReport(name, report)
+    ns.Print(L["Snapshot \"%s\" restored."]:format(name), true)
+    if report.bindingsDone then ns.Print(L["Keybindings: %d."]:format(report.bindings), true) end
+    if report.actionsDone then
+        ns.Print(L["Action buttons placed: %d."]:format(report.actions), true)
+        if report.macrosCreated > 0 then ns.Print(L["Macros created: %d."]:format(report.macrosCreated), true) end
+        if #report.failed > 0 then
+            local shown = {}
+            for i = 1, math.min(#report.failed, 10) do shown[i] = report.failed[i] end
+            local text = table.concat(shown, ", ") .. (#report.failed > 10 and ", …" or "")
+            ns.Print(L["Could not place %d buttons (not known by this character): %s"]:format(#report.failed, text), true)
+        end
+    end
+    if report.layoutError then ns.Print(report.layoutError, true) end
+    if report.layoutName then ns.ShowPopup("RUSCUUCDM_SNAPSHOT_RELOAD", report.layoutName) end
+end
+
+function ns.RestoreSnapshotNow(name)
+    local report, err = ns.RestoreSnapshot(name)
+    if not report then
+        ns.Print(err, true)
+        return
+    end
+    PrintRestoreReport(name, report)
+    ns.RefreshOptions()
+end
+
+local function SaveSnapshotNow(name)
+    if not ns.CanChangeInterface() then
+        ns.Print(L["Not available in combat."], true)
+        return
+    end
+    local ok, result = ns.SaveSnapshot(name)
+    if not ok then
+        ns.Print(result, true)
+        return
+    end
+    selectedSnapshot = result
+    local keys, buttons = ns.SnapshotCounts(ns.GetSnapshot(result))
+    ns.Print(L["Snapshot \"%s\" saved: %d keybindings, %d action buttons."]:format(result, keys, buttons), true)
+    ns.RefreshOptions()
+end
+
+local function ShowSnapshotExport(name)
+    local text = ns.ExportSnapshot(name)
+    if not text then return end
+    local p = GetTextPopup()
+    p.title:SetText(L["Export snapshot"] .. ": " .. name)
+    p.hint:SetText(L["Press Ctrl+C to copy."])
+    p.edit:SetText(text)
+    p.action:SetText(L["Close"])
+    p.action:SetScript("OnClick", function() p:Hide() end)
+    p:Show()
+    p.edit:SetFocus()
+    p.edit:HighlightText()
+end
+
+local function ShowSnapshotImport()
+    local p = GetTextPopup()
+    p.title:SetText(L["Import snapshot"])
+    p.hint:SetText(L["Paste the text with Ctrl+V and press Import."])
+    p.edit:SetText("")
+    p.action:SetText(L["Import"])
+    p.action:SetScript("OnClick", function()
+        local ok, result = ns.ImportSnapshot(p.edit:GetText())
+        if ok then
+            selectedSnapshot = result
+            ns.Print(L["Snapshot imported: %s"]:format(result), true)
+            ns.RefreshOptions()
+            p:Hide()
+        else
+            ns.Print(result, true)
+        end
+    end)
+    p:Show()
+    p.edit:SetFocus()
+end
+
+StaticPopupDialogs["RUSCUUCDM_SNAPSHOT_RESTORE"] = {
+    textKey = "Restore snapshot \"%s\"? The parts you checked will replace your current interface.",
+    text = "",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function(_, name) ns.RestoreSnapshotNow(name) end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
+StaticPopupDialogs["RUSCUUCDM_SNAPSHOT_OVERWRITE"] = {
+    textKey = "Replace snapshot \"%s\" with your current interface?",
+    text = "",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function(_, name) SaveSnapshotNow(name) end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
+StaticPopupDialogs["RUSCUUCDM_SNAPSHOT_DELETE"] = {
+    textKey = "Delete snapshot \"%s\"?",
+    text = "",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function(_, name)
+        ns.DeleteSnapshot(name)
+        ns.RefreshOptions()
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
+StaticPopupDialogs["RUSCUUCDM_SNAPSHOT_RELOAD"] = {
+    textKey = "The positions were saved as the Edit Mode layout \"%s\". Reload the interface now to apply them?",
+    text = "",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function() ReloadUI() end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
+local function BuildInterface(ui)
+    ui:Section(L["Save your interface"])
+    local _, h = ui:Note(L["A snapshot keeps the positions of the game's frames (Edit Mode layout), all your keybindings and what is on your action bars, including your macros. Snapshots belong to your account: you can restore them on any character. Only out of combat."])
+    ui:Next(h)
+    local nameBox
+    nameBox = ui:EditBox(1, L["Snapshot name"], function(text)
+        SaveSnapshotNow(text)
+        nameBox:SetText("")
+    end, nil, L["Write a name and press Enter or Save."])
+    ui:Button(2, L["Save"], 160, function()
+        local text = nameBox:GetText()
+        if ns.GetSnapshot(strtrim(text or "")) then
+            ns.ShowPopup("RUSCUUCDM_SNAPSHOT_OVERWRITE", strtrim(text), nil, strtrim(text))
+        else
+            SaveSnapshotNow(text)
+        end
+        nameBox:SetText("")
+    end, L["Saves your current positions, keybindings and action bars under this name."])
+    ui:Next(36)
+
+    ui:Section(L["Saved snapshots"])
+    ui:Dropdown(1, L["Snapshot"], SnapshotOptions, CurrentSnapshot,
+        function(name) selectedSnapshot = name; ns.RefreshOptions() end)
+    local info = ui:Note("", 2)
+    OnRefresh(function() info:SetText(SnapshotInfo(CurrentSnapshot())) end)
+    ui:Next(64)
+
+    local function withSnapshot(fn)
+        return function()
+            local name = CurrentSnapshot()
+            if name then fn(name) else ns.Print(L["No snapshots yet: write a name and press Save."], true) end
+        end
+    end
+    ui:Button(1, L["Restore"], 108, withSnapshot(function(name)
+        ns.ShowPopup("RUSCUUCDM_SNAPSHOT_RESTORE", name, nil, name)
+    end), L["Puts back the parts checked below. Spells your character doesn't know are skipped and listed in the chat."])
+    ui:Button(1, L["Update"], 108, withSnapshot(function(name)
+        ns.ShowPopup("RUSCUUCDM_SNAPSHOT_OVERWRITE", name, nil, name)
+    end), L["Replaces this snapshot with your current interface."], 114)
+    ui:Button(1, L["Delete"], 108, withSnapshot(function(name)
+        ns.ShowPopup("RUSCUUCDM_SNAPSHOT_DELETE", name, nil, name)
+    end), nil, 228)
+    ui:Button(1, L["Export"], 108, withSnapshot(ShowSnapshotExport),
+        L["Copy the snapshot as text to keep it or share it."], 342)
+    ui:Button(1, L["Import"], 108, ShowSnapshotImport, L["Paste a snapshot copied as text."], 456)
+    ui:Next(36)
+
+    ui:Section(L["What to restore"])
+    local restore = ns.global.snapshotRestore
+    ui:Check(1, L["Frame positions (Edit Mode)"], function() return restore.layout end,
+        function(on) restore.layout = on end,
+        L["Saved as an account Edit Mode layout called \"Ruscuu\" plus the snapshot name, and made active. The interface reloads to apply it. Frames from other addons (Bartender4, ElvUI...) use their own profiles."])
+    ui:Next(28)
+    ui:Check(1, L["Keybindings"], function() return restore.bindings end,
+        function(on) restore.bindings = on end,
+        L["Replaces all your keybindings, including Shift, Ctrl and Alt combinations."])
+    ui:Next(28)
+    ui:Check(1, L["Action bars"], function() return restore.actions end,
+        function(on) restore.actions = on end,
+        L["Spells, items, macros, mounts, toys and equipment sets on bars 1 to 8. Missing macros are created again. Each specialization has its own bars: restore while in the specialization you want to fill."])
+    ui:Next(32)
+end
+
+------------------------------------------------------------------------
 -- Registro en el panel de opciones de Blizzard
 ------------------------------------------------------------------------
 
@@ -1629,6 +1850,10 @@ local SUBPAGES = {
         resetKeys = { "threatBar", "threatShow", "threatWidth", "threatHeight", "threatX", "threatY", "threatFontSize",
             "threatTextPosition", "threatTextColor", "threatTextUseColor", "threatColorLow", "threatColorHigh",
             "threatColorInsecure", "threatColorTanking", "threatColorSecret", "threatBgColor" },
+    },
+    {
+        key = "interface", titleKey = "Interface", descKey = "Save and restore your frame positions, keybindings and action bars.",
+        build = BuildInterface,
     },
     {
         key = "profiles", titleKey = "Profiles & Themes", descKey = "Themes, profiles per specialization and import/export.",
