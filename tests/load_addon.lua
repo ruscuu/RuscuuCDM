@@ -13,7 +13,7 @@ assert(ns.GetSpellHotkey(100) == "1", "tecla del hechizo tras iniciar sesión")
 
 -- Páginas de opciones: empiezan ocultas y se construyen la primera vez que se muestran
 -- (si empezaran visibles, la primera vez saldrían en blanco)
-assert(#pages == 10, "páginas registradas: " .. #pages)
+assert(#pages == 11, "páginas registradas: " .. #pages)
 for i, page in ipairs(pages) do
     assert(not page:IsShown(), "la página " .. i .. " debe empezar oculta")
     page._width = 640

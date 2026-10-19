@@ -362,6 +362,9 @@ local function Decode(text)
     return table.concat(out)
 end
 
+-- También las usan las instantáneas de la interfaz (Snapshots.lua)
+ns.Base64Encode, ns.Base64Decode = Encode, Decode
+
 local function IsColor(value)
     return type(value) == "table" and value[1] ~= nil
 end
@@ -402,9 +405,17 @@ local function Flatten(defaults, values, prefix, out)
     end
 end
 
-function ns.ExportProfile()
+-- name: perfil que se exporta (por defecto el activo)
+function ns.ExportProfile(name)
+    local values = ns.db
+    if name and name ~= ns.activeProfile then
+        -- Los perfiles que no están en uso pueden no tener todavía todos los valores: se completan en una copia
+        values = ns.CopyTable(ns.global.profiles[name] or {})
+        ns.MigrateProfile(values)
+        ns.ApplyDefaults(values, ns.PROFILE_DEFAULTS)
+    end
     local out = {}
-    Flatten(ns.PROFILE_DEFAULTS, ns.db, "", out)
+    Flatten(ns.PROFILE_DEFAULTS, values, "", out)
     table.sort(out)
     return PREFIX .. Encode(table.concat(out, ";"))
 end
@@ -469,18 +480,38 @@ local function ImportValue(target, key, raw)
     return true
 end
 
-function ns.ImportProfile(text)
+-- Lee un texto exportado sobre una copia de base; devuelve la copia y cuántos valores eran válidos
+local function ParseProfile(text, base)
     local payload = strtrim(text or ""):match("^" .. PREFIX:gsub("%p", "%%%0") .. "(.+)$")
-    if not payload then return false, L["Invalid import string."] end
-
-    -- Se importa sobre una copia y solo se aplica si al menos un valor es válido
-    local imported = ns.CopyTable(ns.db)
+    if not payload then return nil, 0 end
+    local imported = ns.CopyTable(base)
     local count = 0
     for pair in Decode(payload):gmatch("[^;]+") do
         local key, raw = pair:match("^([%w%.]+)=(.*)$")
         if key and ImportValue(imported, key, raw) then count = count + 1 end
     end
-    if count == 0 then return false, L["Invalid import string."] end
+    return imported, count
+end
+
+-- Guarda un texto exportado como el perfil "name" (sustituye al que tenga ese nombre); devuelve el nombre
+function ns.ImportProfileAs(name, text)
+    local imported, count = ParseProfile(text, ns.PROFILE_DEFAULTS)
+    if not imported or count == 0 then return nil end
+    local profiles = ns.global.profiles
+    if profiles[name] then
+        -- Se rellena la misma tabla: si es el perfil activo, ns.db sigue apuntando a ella
+        wipe(profiles[name])
+        for k, v in pairs(imported) do profiles[name][k] = v end
+    else
+        profiles[name] = imported
+    end
+    return name
+end
+
+function ns.ImportProfile(text)
+    -- Se importa sobre una copia y solo se aplica si al menos un valor es válido
+    local imported, count = ParseProfile(text, ns.db)
+    if not imported or count == 0 then return false, L["Invalid import string."] end
 
     wipe(ns.db)
     for k, v in pairs(imported) do ns.db[k] = v end

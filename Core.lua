@@ -298,6 +298,8 @@ local GLOBAL_DEFAULTS = {
     profiles = {},
     chars = {},
     classProfiles = {},              -- [CLASE] = perfil propio de esa clase (para que no se mezclen sus hechizos)
+    snapshots = {},                  -- [nombre] = instantánea de la interfaz (posiciones, teclas, barras)
+    snapshotRestore = { layout = true, bindings = true, macros = true, actions = true }, -- qué partes se restauran
 }
 
 ------------------------------------------------------------------------
@@ -574,6 +576,7 @@ function ns.PrintHelp()
     print("  /rcm test  — " .. L["preview the golden border for 5 seconds"])
     print("  /rcm skin  — " .. L["reapply the style"])
     print("  /rcm minimap  — " .. L["show or hide the minimap button"])
+    print("  /rcm ui  — " .. L["save or restore your interface (positions, keybindings, action bars)"])
     print("  /rcm debug  — " .. L["diagnostic information"])
     print("  /rcm reset  — " .. L["reset all settings"])
 end
@@ -593,6 +596,8 @@ SlashCmdList.RUSCUUCDM = function(msg)
         ns.TestExpire(5)
     elseif msg == "cooldowns" or msg == "cdm" or msg == "spells" then
         ns.OpenCooldownSettings()
+    elseif msg == "ui" or msg == "interface" then
+        ns.OpenOptions("interface")
     elseif msg == "minimap" then
         ns.SetMinimapShown(ns.global.minimap.hide)
         ns.Print(ns.global.minimap.hide and L["Minimap button hidden."] or L["Minimap button shown."], true)
