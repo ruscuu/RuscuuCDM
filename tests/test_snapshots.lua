@@ -202,4 +202,27 @@ assert(not ns.ImportSnapshot("hola"), "texto sin prefijo")
 
 ns.DeleteSnapshot("Raid (2)")
 assert(ns.GetSnapshot("Raid (2)") == nil and #ns.GetSnapshotNames() == 1, "borrar")
+
+------------------------------------------------------------------------
+-- Exportar todo e importarlo en una instalación nueva (por ejemplo, de la beta a la 1.0)
+------------------------------------------------------------------------
+
+local active = ns.activeProfile
+ns.db.iconZoom = 0.2
+ns.global.profiles.Otro = { iconZoom = 0.1 }   -- perfil sin usar: todavía sin valores por defecto
+local everything = ns.ExportAll()
+assert(everything:sub(1, 13) == "!RUSCUUALL:1!", "prefijo de exportar todo")
+
+-- Instalación nueva: sin instantáneas, el perfil activo con los valores por defecto y sin el perfil Otro
+ns.global.snapshots = {}
+wipe(ns.db); ns.ApplyDefaults(ns.db, ns.PROFILE_DEFAULTS)
+ns.global.profiles.Otro = nil
+local okAll, nSnap, nProf = ns.ImportAll(everything)
+assert(okAll and nSnap == 1 and nProf == #ns.GetProfileNames(), "importar todo: " .. tostring(nSnap) .. " " .. tostring(nProf))
+assert(ns.GetSnapshot("Raid") and ns.GetSnapshot("Raid").macros.Suelta.body == "/dance", "la instantánea vuelve con el mismo nombre")
+assert(ns.activeProfile == active and ns.db.iconZoom == 0.2, "el perfil con el mismo nombre recibe el estilo exportado")
+assert(ns.global.profiles.Otro.iconZoom == 0.1 and ns.global.profiles.Otro.squareIcons == true, "perfil sin usar, con sus valores completos")
+okAll = ns.ImportAll(everything)
+assert(okAll and #ns.GetSnapshotNames() == 1, "importar dos veces no duplica")
+assert(not ns.ImportAll("!RUSCUUALL:1!" .. ns.Base64Encode("X\tnada")), "sin datos válidos no se importa")
 print("instantáneas de la interfaz: OK")

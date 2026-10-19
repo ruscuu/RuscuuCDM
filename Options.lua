@@ -1689,6 +1689,38 @@ local function ShowSnapshotImport()
     p.edit:SetFocus()
 end
 
+local function ShowExportAll()
+    local p = GetTextPopup()
+    p.title:SetText(L["Export everything"])
+    p.hint:SetText(L["Press Ctrl+C to copy, and keep the text in a file on your computer."])
+    p.edit:SetText(ns.ExportAll())
+    p.action:SetText(L["Close"])
+    p.action:SetScript("OnClick", function() p:Hide() end)
+    p:Show()
+    p.edit:SetFocus()
+    p.edit:HighlightText()
+end
+
+local function ShowImportAll()
+    local p = GetTextPopup()
+    p.title:SetText(L["Import everything"])
+    p.hint:SetText(L["Paste with Ctrl+V. Snapshots and profiles with the same name are replaced."])
+    p.edit:SetText("")
+    p.action:SetText(L["Import"])
+    p.action:SetScript("OnClick", function()
+        local ok, snapshots, profiles = ns.ImportAll(p.edit:GetText())
+        if ok then
+            ns.Print(L["Imported %d snapshots and %d style profiles."]:format(snapshots, profiles), true)
+            ns.RefreshOptions()
+            p:Hide()
+        else
+            ns.Print(snapshots, true)
+        end
+    end)
+    p:Show()
+    p.edit:SetFocus()
+end
+
 StaticPopupDialogs["RUSCUUCDM_SNAPSHOT_RESTORE"] = {
     textKey = "Restore snapshot \"%s\"? The parts you checked will replace your current interface.",
     text = "",
@@ -1800,6 +1832,13 @@ local function BuildInterface(ui)
     ui:Check(1, L["Action bars"], function() return restore.actions end,
         function(on) restore.actions = on end,
         L["Spells, items, macros, mounts, toys and equipment sets on bars 1 to 8. Each specialization has its own bars: restore while in the specialization you want to fill."])
+    ui:Next(32)
+
+    ui:Section(L["Move everything to another game version"])
+    local _, h2 = ui:Note(L["All your snapshots and style profiles in a single text. Export it before changing game version (for example, from the beta to the release), keep it in a file, and import it in the new version. Spells your new character doesn't know yet are placed when you restore again after learning them."])
+    ui:Next(h2)
+    ui:Button(1, L["Export everything"], 200, ShowExportAll)
+    ui:Button(1, L["Import everything"], 200, ShowImportAll, nil, 210)
     ui:Next(32)
 end
 

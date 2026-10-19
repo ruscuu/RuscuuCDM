@@ -470,15 +470,56 @@ function ns.ParseSnapshot(text)
     return name or L["Imported"], snap
 end
 
--- Importa como una instantánea nueva (si el nombre ya existe se le añade un número)
-function ns.ImportSnapshot(text)
+-- Importa como una instantánea nueva (si el nombre ya existe se le añade un número, salvo con replace)
+function ns.ImportSnapshot(text, replace)
     local name, snap = ns.ParseSnapshot(text)
     if not name then return false, snap end
     local base, n = name, 2
-    while ns.global.snapshots[name] do
+    while ns.global.snapshots[name] and not replace do
         name = ("%s (%d)"):format(base, n)
         n = n + 1
     end
     ns.global.snapshots[name] = snap
     return true, name
+end
+
+------------------------------------------------------------------------
+-- Exportar / importar todo: todas las instantáneas y todos los perfiles de estilo en un solo texto,
+-- para llevarlos a otra cuenta o a otra versión del juego (por ejemplo, de la beta a la 1.0).
+-- "!RUSCUUALL:1!" + base64 de líneas: "S\t<instantánea exportada>" y "P\t<nombre>\t<perfil exportado>".
+------------------------------------------------------------------------
+
+local ALL_PREFIX = "!RUSCUUALL:1!"
+
+function ns.ExportAll()
+    local lines = {}
+    for _, name in ipairs(ns.GetSnapshotNames()) do
+        lines[#lines + 1] = "S\t" .. ns.ExportSnapshot(name)
+    end
+    for _, name in ipairs(ns.GetProfileNames()) do
+        lines[#lines + 1] = "P\t" .. Escape(name) .. "\t" .. ns.ExportProfile(name)
+    end
+    return ALL_PREFIX .. ns.Base64Encode(table.concat(lines, "\n"))
+end
+
+-- Importa todo lo válido; lo que tenga el mismo nombre se sustituye (así el perfil Default de una
+-- instalación nueva recibe el estilo exportado). Devuelve cuántas instantáneas y perfiles se importaron.
+function ns.ImportAll(text)
+    local payload = strtrim(text or ""):match("^" .. ALL_PREFIX:gsub("%p", "%%%0") .. "(.+)$")
+    if not payload then return false, L["Invalid import string."] end
+    local snapshots, profiles = 0, 0
+    for line in ns.Base64Decode(payload):gmatch("[^\n]+") do
+        local kind, a, b = line:match("^(%u)\t([^\t]*)\t?([^\t]*)$")
+        if kind == "S" and ns.ImportSnapshot(a, true) then
+            snapshots = snapshots + 1
+        elseif kind == "P" and ValidText(Unescape(a), 60) and ns.ImportProfileAs(Unescape(a), b) then
+            profiles = profiles + 1
+        end
+    end
+    if snapshots + profiles == 0 then return false, L["Invalid import string."] end
+    if profiles > 0 then
+        ns.UseProfile(ns.activeProfile)
+        ns.RefreshAll()
+    end
+    return true, snapshots, profiles
 end

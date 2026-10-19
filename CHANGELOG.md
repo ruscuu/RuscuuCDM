@@ -6,6 +6,7 @@
 - **Save your interface**: new **Interface** options page (also `/rcm ui`). A snapshot keeps your frame positions (the active Edit Mode layout), all your keybindings (with Shift, Ctrl and Alt combinations), all your account and character macros (also the ones that are not on a bar) and what is on action bars 1 to 8: spells, items, macros, mounts, toys, pets and equipment sets. Snapshots belong to your account, so you can restore them on any character.
 - Restore chooses which parts to put back. Positions are saved as an account Edit Mode layout named "Ruscuu" plus the snapshot name and the interface reloads to apply them; missing macros are created again and changed ones get their saved text back, and anything the character doesn't know is listed in the chat. Only out of combat.
 - Export a snapshot as text to keep it or share it, and import it on another account.
+- **Export everything / Import everything**: all your snapshots and style profiles in a single text, to move them to another game version (for example, from the beta to the release) or another computer. Importing replaces snapshots and profiles with the same name, so a fresh install gets your style back.
 
 ## v0.7.2
 

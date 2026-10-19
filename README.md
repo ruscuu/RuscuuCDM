@@ -20,7 +20,7 @@ It only changes how things look — it never reads combat data, so it follows Fo
 - **Themes:** Ruscuu Neon, Minimal, Dark, Class color and Blizzard style.
 - **Profiles per specialization** that switch automatically, plus rename, duplicate and reset. Each class starts with its own profile, so spells never mix between characters.
 - **Import / Export** your style as a text string to share it.
-- **Save your interface**: snapshots of your frame positions (Edit Mode layout), all your keybindings, all your macros and your action bars (spells, items, macros, mounts, toys, equipment sets). Restore them on any character, choose which parts to restore, and export them as text. Only out of combat.
+- **Save your interface**: snapshots of your frame positions (Edit Mode layout), all your keybindings, all your macros and your action bars (spells, items, macros, mounts, toys, equipment sets). Restore them on any character, choose which parts to restore, and export them as text. **Export everything** puts all your snapshots and style profiles in one text to move them to another game version (for example, from the beta to the release). Only out of combat.
 - Options with live preview, help on every control, values you can type and a Defaults button on each page.
 - Minimap button with the Ruscuu bear (round or square minimaps).
 - English, Spanish, German, French, Portuguese and Russian.
@@ -60,7 +60,7 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 - **Temas:** Ruscuu Neón, Minimalista, Oscuro, Color de clase y Estilo Blizzard.
 - **Perfiles por especialización** que cambian solos, además de renombrar, duplicar y restablecer. Cada clase empieza con su propio perfil, así los hechizos no se mezclan entre personajes.
 - **Importar / Exportar** tu estilo como texto para compartirlo.
-- **Guarda tu interfaz**: instantáneas de las posiciones de tus marcos (diseño del Modo Edición), todas tus teclas asignadas, todas tus macros y tus barras de acción (hechizos, objetos, macros, monturas, juguetes y equipamientos). Restáuralas en cualquier personaje, elige qué partes restaurar y expórtalas como texto. Solo fuera de combate.
+- **Guarda tu interfaz**: instantáneas de las posiciones de tus marcos (diseño del Modo Edición), todas tus teclas asignadas, todas tus macros y tus barras de acción (hechizos, objetos, macros, monturas, juguetes y equipamientos). Restáuralas en cualquier personaje, elige qué partes restaurar y expórtalas como texto. **Exportar todo** pone todas tus instantáneas y perfiles de estilo en un solo texto para llevarlos a otra versión del juego (por ejemplo, de la beta a la versión final). Solo fuera de combate.
 - Opciones con vista previa en vivo, ayuda en cada control, valores que se pueden escribir y botón de valores por defecto en cada página.
 - Botón en el minimapa con el oso Ruscuu (minimapa redondo o cuadrado).
 - Inglés, español, alemán, francés, portugués y ruso.
