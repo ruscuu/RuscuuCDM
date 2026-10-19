@@ -1,6 +1,6 @@
 -- Ruscuu Cooldown Manager Forever: instantáneas de la interfaz.
--- Guarda y restaura tres cosas del juego: las posiciones de los marcos (diseño del Modo Edición),
--- las teclas asignadas y el contenido de las barras de acción (con el texto de las macros).
+-- Guarda y restaura cuatro cosas del juego: las posiciones de los marcos (diseño del Modo Edición),
+-- las teclas asignadas, todas las macros y el contenido de las barras de acción.
 -- Nada de esto lee datos de combate, y todo se hace fuera de combate: el juego bloquea esas funciones en combate.
 -- Las instantáneas son de la cuenta, así que se pueden restaurar en cualquier personaje.
 local _, ns = ...
@@ -171,6 +171,43 @@ local function CaptureMacro(name, macros)
     macros[name] = { icon = icon, body = body, perChar = index > MAX_ACCOUNT_MACROS }
 end
 
+-- Todas las macros de la cuenta y del personaje, estén o no en una barra
+local function CaptureAllMacros(macros)
+    if not (GetNumMacros and GetMacroInfo) then return end
+    local numAccount, numChar = GetNumMacros()
+    local function add(index, perChar)
+        local name, icon, body = GetMacroInfo(index)
+        if type(name) == "string" and name ~= "" and type(body) == "string" and not macros[name] then
+            macros[name] = { icon = icon, body = body, perChar = perChar }
+        end
+    end
+    for i = 1, numAccount or 0 do add(i, false) end
+    for i = MAX_ACCOUNT_MACROS + 1, MAX_ACCOUNT_MACROS + (numChar or 0) do add(i, true) end
+end
+
+-- Crea las macros que falten y pone el texto guardado en las que ya existen con el mismo nombre
+local function RestoreMacros(macros, report)
+    local names = {}
+    for name in pairs(macros) do names[#names + 1] = name end
+    table.sort(names)
+    for _, name in ipairs(names) do
+        local m = macros[name]
+        local index = GetMacroIndexByName and GetMacroIndexByName(name) or 0
+        if index > 0 then
+            local _, icon, body = GetMacroInfo(index)
+            if (body ~= m.body or icon ~= m.icon) and EditMacro then
+                if Call(EditMacro, index, name, m.icon or icon, m.body) then report.macrosUpdated = report.macrosUpdated + 1 end
+            end
+        elseif CreateMacro then
+            if (Call(CreateMacro, name, m.icon or "INV_MISC_QUESTIONMARK", m.body, m.perChar) or 0) > 0 then
+                report.macrosCreated = report.macrosCreated + 1
+            else
+                report.macrosFailed = report.macrosFailed + 1
+            end
+        end
+    end
+end
+
 -- Botón de hechizo del libro (para los menús desplegables: portales, totems...)
 local function FindFlyoutSlot(flyoutID)
     if not (C_SpellBook and C_SpellBook.GetNumSpellBookSkillLines and C_SpellBook.GetSpellBookItemInfo) then return end
@@ -300,6 +337,7 @@ function ns.CaptureInterface()
             if action.t == "macro" then CaptureMacro(action.id, snap.macros) end
         end
     end
+    CaptureAllMacros(snap.macros)
     local name, realm = UnitName("player"), GetRealmName()
     snap.character = name and (name .. "-" .. (realm or "")) or nil
     local _, class = UnitClass("player")
@@ -310,11 +348,12 @@ function ns.CaptureInterface()
     return snap
 end
 
--- Cuántas teclas y botones tiene una instantánea
+-- Cuántas teclas, botones y macros tiene una instantánea
 function ns.SnapshotCounts(snap)
-    local actions = 0
+    local actions, macros = 0, 0
     for _ in pairs(snap.actions or {}) do actions = actions + 1 end
-    return #(snap.bindings or {}), actions
+    for _ in pairs(snap.macros or {}) do macros = macros + 1 end
+    return #(snap.bindings or {}), actions, macros
 end
 
 function ns.SaveSnapshot(name)
@@ -328,16 +367,20 @@ function ns.DeleteSnapshot(name)
     ns.global.snapshots[name] = nil
 end
 
--- Restaura las partes elegidas ({ layout, bindings, actions }); devuelve un informe o nil y el motivo
+-- Restaura las partes elegidas ({ layout, bindings, macros, actions }); devuelve un informe o nil y el motivo
 function ns.RestoreSnapshot(name, parts)
     local snap = ns.GetSnapshot(name)
     if not snap then return nil, L["That snapshot no longer exists."] end
     if not ns.CanChangeInterface() then return nil, L["Not available in combat."] end
     parts = parts or ns.global.snapshotRestore
-    local report = { bindings = 0, actions = 0, macrosCreated = 0, failed = {} }
+    local report = { bindings = 0, actions = 0, macrosCreated = 0, macrosUpdated = 0, macrosFailed = 0, failed = {} }
     if parts.bindings and snap.bindings then
         report.bindings = RestoreBindings(snap.bindings)
         report.bindingsDone = true
+    end
+    if parts.macros and snap.macros then
+        RestoreMacros(snap.macros, report)
+        report.macrosDone = true
     end
     if parts.actions and snap.actions then
         RestoreActions(snap.actions, snap.macros or {}, report)

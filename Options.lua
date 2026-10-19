@@ -1594,7 +1594,7 @@ end
 local function SnapshotInfo(name)
     local snap = ns.GetSnapshot(name)
     if not snap then return L["No snapshots yet: write a name and press Save."] end
-    local keys, buttons = ns.SnapshotCounts(snap)
+    local keys, buttons, macros = ns.SnapshotCounts(snap)
     local lines = {}
     if snap.character then
         local who = snap.character .. (snap.spec and (" · " .. snap.spec) or "")
@@ -1602,7 +1602,7 @@ local function SnapshotInfo(name)
         lines[#lines + 1] = L["Saved by %s"]:format(who)
     end
     lines[#lines + 1] = L["Positions: %s"]:format(snap.layout and (snap.layoutName or L["yes"]) or L["no"])
-    lines[#lines + 1] = L["%d keybindings, %d action buttons"]:format(keys, buttons)
+    lines[#lines + 1] = L["%d keybindings, %d action buttons, %d macros"]:format(keys, buttons, macros)
     return table.concat(lines, "\n")
 end
 
@@ -1610,9 +1610,13 @@ end
 local function PrintRestoreReport(name, report)
     ns.Print(L["Snapshot \"%s\" restored."]:format(name), true)
     if report.bindingsDone then ns.Print(L["Keybindings: %d."]:format(report.bindings), true) end
+    if report.macrosCreated > 0 then ns.Print(L["Macros created: %d."]:format(report.macrosCreated), true) end
+    if report.macrosUpdated > 0 then ns.Print(L["Macros updated: %d."]:format(report.macrosUpdated), true) end
+    if report.macrosFailed > 0 then
+        ns.Print(L["Could not create %d macros: there is no free macro slot."]:format(report.macrosFailed), true)
+    end
     if report.actionsDone then
         ns.Print(L["Action buttons placed: %d."]:format(report.actions), true)
-        if report.macrosCreated > 0 then ns.Print(L["Macros created: %d."]:format(report.macrosCreated), true) end
         if #report.failed > 0 then
             local shown = {}
             for i = 1, math.min(#report.failed, 10) do shown[i] = report.failed[i] end
@@ -1645,8 +1649,8 @@ local function SaveSnapshotNow(name)
         return
     end
     selectedSnapshot = result
-    local keys, buttons = ns.SnapshotCounts(ns.GetSnapshot(result))
-    ns.Print(L["Snapshot \"%s\" saved: %d keybindings, %d action buttons."]:format(result, keys, buttons), true)
+    local keys, buttons, macros = ns.SnapshotCounts(ns.GetSnapshot(result))
+    ns.Print(L["Snapshot \"%s\" saved: %d keybindings, %d action buttons, %d macros."]:format(result, keys, buttons, macros), true)
     ns.RefreshOptions()
 end
 
@@ -1789,9 +1793,13 @@ local function BuildInterface(ui)
         function(on) restore.bindings = on end,
         L["Replaces all your keybindings, including Shift, Ctrl and Alt combinations."])
     ui:Next(28)
+    ui:Check(1, L["Macros"], function() return restore.macros end,
+        function(on) restore.macros = on end,
+        L["All your account and character macros, even the ones that are not on a bar. Missing macros are created and the ones with the same name get the saved text. Macros you made later are kept."])
+    ui:Next(28)
     ui:Check(1, L["Action bars"], function() return restore.actions end,
         function(on) restore.actions = on end,
-        L["Spells, items, macros, mounts, toys and equipment sets on bars 1 to 8. Missing macros are created again. Each specialization has its own bars: restore while in the specialization you want to fill."])
+        L["Spells, items, macros, mounts, toys and equipment sets on bars 1 to 8. Each specialization has its own bars: restore while in the specialization you want to fill."])
     ui:Next(32)
 end
 

@@ -37,7 +37,7 @@ read_globals = {
     -- Instantáneas de la interfaz (Modo Edición, teclas, barras de acción y macros)
     "C_EditMode", "C_EquipmentSet", "C_MountJournal", "C_PetJournal", "C_ToyBox", "EditModePresetLayoutManager",
     "ClearCursor", "CreateMacro", "GetActionText", "GetBinding", "GetCurrentBindingSet", "GetCursorInfo",
-    "GetMacroIndexByName", "GetMacroInfo", "GetNumBindings", "PickupAction", "PickupItem", "PickupMacro",
+    "GetMacroIndexByName", "GetMacroInfo", "GetNumBindings", "GetNumMacros", "EditMacro", "PickupAction", "PickupItem", "PickupMacro",
     "PickupSpell", "PlaceAction", "PlayerHasToy", "SaveBindings", "SetBinding",
 
     -- Frames, objetos y constantes de Blizzard

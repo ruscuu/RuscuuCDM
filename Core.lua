@@ -299,7 +299,7 @@ local GLOBAL_DEFAULTS = {
     chars = {},
     classProfiles = {},              -- [CLASE] = perfil propio de esa clase (para que no se mezclen sus hechizos)
     snapshots = {},                  -- [nombre] = instantánea de la interfaz (posiciones, teclas, barras)
-    snapshotRestore = { layout = true, bindings = true, actions = true }, -- qué partes se restauran
+    snapshotRestore = { layout = true, bindings = true, macros = true, actions = true }, -- qué partes se restauran
 }
 
 ------------------------------------------------------------------------

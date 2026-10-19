@@ -14,7 +14,7 @@ for _ = 1, 3 do M.RunTimers() end
 local slots = {}          -- [hueco] = { kind, id }
 local cursor
 local known = { [100] = true, [200] = true }
-local macros = { { name = "Curar", icon = 1, body = "/cast S100" } }
+local macros = { { name = "Curar", icon = 1, body = "/cast S100" }, { name = "Suelta", icon = 2, body = "/dance" } }
 
 HasAction = function(slot) if slot > 180 then error("hueco no válido") end return slots[slot] ~= nil end
 GetActionInfo = function(slot)
@@ -34,13 +34,18 @@ GetMacroIndexByName = function(name)
     for i, m in ipairs(macros) do if m.name == name then return i end end
     return 0
 end
-GetMacroInfo = function(name)
-    local m = macros[GetMacroIndexByName(name)]
+GetNumMacros = function() return #macros, 0 end
+GetMacroInfo = function(nameOrIndex)
+    local m = macros[type(nameOrIndex) == "number" and nameOrIndex or GetMacroIndexByName(nameOrIndex)]
     if m then return m.name, m.icon, m.body end
 end
 CreateMacro = function(name, icon, body)
     macros[#macros + 1] = { name = name, icon = icon, body = body }
     return #macros
+end
+EditMacro = function(index, name, icon, body)
+    macros[index] = { name = name, icon = icon, body = body }
+    return index
 end
 PickupMacro = function(index) cursor = { kind = "macro", index = index } end
 
@@ -99,6 +104,7 @@ assert(#snap.bindings == 3, "teclas guardadas: " .. #snap.bindings)
 assert(count(snap.actions) == 4, "botones guardados")
 assert(snap.actions[3].t == "macro" and snap.actions[3].id == "Curar", "las macros se guardan por nombre")
 assert(snap.macros.Curar.body == "/cast S100", "y con su texto")
+assert(snap.macros.Suelta.body == "/dance", "también las macros que no están en ninguna barra")
 assert(snap.character == "Alma-Reino" and snap.class == "DRUID", "quién la guardó")
 assert(not ns.SaveSnapshot("   "), "hace falta un nombre")
 
@@ -112,7 +118,7 @@ slots = { [1] = { kind = "item", id = 9 }, [7] = { kind = "spell", id = 100 } }
 macros = {}
 known[200] = nil
 
-local report = ns.RestoreSnapshot("Raid", { layout = true, bindings = true, actions = true })
+local report = ns.RestoreSnapshot("Raid", { layout = true, bindings = true, macros = true, actions = true })
 assert(report.bindings == 3 and saveCalls == 1, "teclas restauradas y guardadas")
 local keys = {}
 for _, b in ipairs(bindings) do for k = 2, #b do keys[b[k]] = b[1] end end
@@ -122,16 +128,25 @@ assert(keys["2"] == nil, "las teclas que no estaban se quitan")
 assert(slots[1].kind == "spell" and slots[1].id == 100, "hueco 1")
 assert(slots[2].kind == "item" and slots[2].id == 5, "hueco 2")
 assert(slots[3].kind == "macro" and macros[slots[3].index].body == "/cast S100", "la macro se vuelve a crear")
-assert(report.macrosCreated == 1, "macros creadas")
+assert(report.macrosCreated == 2 and macros[GetMacroIndexByName("Suelta")].body == "/dance", "macros creadas: " .. report.macrosCreated)
+
 assert(slots[7] == nil, "los huecos vacíos en la instantánea se vacían")
 assert(slots[150] == nil and #report.failed == 1 and report.failed[1] == "S200", "lo que no conoce se informa")
 assert(report.actions == 3, "botones colocados: " .. report.actions)
 assert(cursor == nil, "el cursor queda vacío")
 
+
 assert(report.layoutName == "Ruscuu Raid", "diseño nuevo de cuenta")
 assert(#savedLayouts.layouts == 2 and savedLayouts.layouts[2].layoutName == "Ruscuu Raid", "se añade a los diseños")
 assert(savedLayouts.layouts[2].data == "A" and savedLayouts.layouts[2].layoutType == 1, "con las posiciones guardadas")
 assert(savedLayouts.activeLayout == 4, "y queda activo (después de los 2 de Blizzard)")
+
+-- Macros: la que cambió recupera su texto y la creada después se conserva
+macros[GetMacroIndexByName("Suelta")].body = "/sit"
+macros[#macros + 1] = { name = "Nueva", icon = 3, body = "/wave" }
+report = ns.RestoreSnapshot("Raid", { macros = true })
+assert(report.macrosUpdated == 1 and macros[GetMacroIndexByName("Suelta")].body == "/dance", "macro actualizada")
+assert(GetMacroIndexByName("Nueva") > 0, "las macros nuevas no se borran")
 
 -- Restaurar otra vez: no se duplica el diseño, se sustituye
 editLayouts = savedLayouts
@@ -169,7 +184,7 @@ assert(ok2 and imported == "Raid (2)", "no pisa una instantánea con el mismo no
 local copy = ns.GetSnapshot("Raid (2)")
 assert(copy.layout == snap.layout and #copy.bindings == #snap.bindings, "mismas posiciones y teclas")
 assert(count(copy.actions) == count(snap.actions) and copy.actions[3].id == "Curar" and copy.actions[150].id == 200, "mismos botones")
-assert(copy.macros.Curar.body == "/cast S100", "mismas macros")
+assert(copy.macros.Curar.body == "/cast S100" and copy.macros.Suelta.body == "/dance", "mismas macros")
 
 -- Textos con tabuladores y saltos de línea en una macro sobreviven al viaje
 snap.macros.Curar.body = "/cast S100\n/say a\tb \\n"
