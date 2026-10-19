@@ -667,5 +667,9 @@ function ns.Debug()
     local refName = ref and C_Spell.GetSpellName and C_Spell.GetSpellName(ref) or ref
     ns.Print(L["Wand lock: reference spell %s, active now %s"]:format(
         ref and tostring(refName) or L["none"], ns.GlobalLock() and yes or no), true)
+    if ns.GetThreatColorInfo then
+        local t = ns.GetThreatColorInfo()
+        ns.Print(L["Threat meter: level hidden by the game %s, color from: %s"]:format(t.hidden and yes or no, t.source), true)
+    end
     ns.Print(L["Active profile: %s"]:format(ns.activeProfile), true)
 end

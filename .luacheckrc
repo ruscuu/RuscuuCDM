@@ -31,7 +31,7 @@ read_globals = {
     "GetRealmName", "geterrorhandler", "GetSpellBaseCooldown", "GetSpecialization", "GetSpecializationInfo", "GetSpecializationInfoForClassID",
     "GetTime", "HasAction", "hooksecurefunc", "InCombatLockdown", "IsLoggedIn", "IsPlayerSpell", "IsShiftKeyDown", "IsSpellKnown",
     "issecretvalue", "LibStub", "PlaySound", "ReloadUI", "SetCVar", "ShowUIPanel", "StaticPopup_Show",
-    "UnitAffectingCombat", "UnitCanAttack", "UnitDetailedThreatSituation", "UnitClass", "UnitName",
+    "UnitAffectingCombat", "UnitCanAttack", "UnitDetailedThreatSituation", "UnitIsUnit", "UnitClass", "UnitName",
 
     -- Frames, objetos y constantes de Blizzard
     "ActionBarButtonEventsFrame", "ChatFontNormal", "ColorPickerFrame", "CooldownViewerSettings",

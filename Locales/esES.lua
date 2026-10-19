@@ -79,6 +79,7 @@ L["Buffs about to end: aura API %s"] = "Buffs a punto de terminar: API de auras 
 L["Active cooldowns: cooldown state %s"] = "Cooldowns activos: estado del cooldown %s"
 L["%d in the bar"] = "%d en la barra"
 L["Active profile: %s"] = "Perfil activo: %s"
+L["Threat meter: level hidden by the game %s, color from: %s"] = "Medidor de amenaza: nivel oculto por el juego %s, color sacado de: %s"
 L["Threat meter above enemies"] = "Medidor de amenaza sobre los enemigos"
 L["About to pull it"] = "A punto de quitárselo"
 L["Above the nameplate of each enemy you are fighting: your threat as a bar, a percentage or both (100% means you would pull it), colored by how close you are to pulling it."] = "Encima de la placa de nombre de cada enemigo con el que luchas: tu amenaza como barra, porcentaje o ambos (100% es cuando le quitarías el objetivo), con un color según lo cerca que estás de quitárselo."

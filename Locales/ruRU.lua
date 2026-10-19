@@ -79,6 +79,7 @@ L["Buffs about to end: aura API %s"] = "Заканчивающиеся бафф�
 L["Active cooldowns: cooldown state %s"] = "Активные восстановления: состояние восстановления %s"
 L["%d in the bar"] = "%d на панели"
 L["Active profile: %s"] = "Активный профиль: %s"
+L["Threat meter: level hidden by the game %s, color from: %s"] = "Шкала угрозы: уровень скрыт игрой %s, цвет из: %s"
 L["Threat meter above enemies"] = "Шкала угрозы над врагами"
 L["About to pull it"] = "Вот-вот сорвёте"
 L["Above the nameplate of each enemy you are fighting: your threat as a bar, a percentage or both (100% means you would pull it), colored by how close you are to pulling it."] = "Над табличкой каждого врага, с которым вы сражаетесь: ваша угроза полосой, процентом или и тем и другим (100% — вы сорвёте агро), цвет зависит от опасности."

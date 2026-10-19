@@ -73,14 +73,46 @@ local function ReleaseMeter(unit)
     spare[#spare + 1] = meter
 end
 
--- Amenaza del jugador sobre la unidad: nil si no está en su lista de amenaza
+-- Amenaza del jugador sobre la unidad: nil si no está en su lista de amenaza.
+-- Devuelve el nivel (0-3), el porcentaje y si te está atacando a ti.
 local function Threat(unit)
-    if GetTime() < previewUntil then return PREVIEW_STATUS, PREVIEW_PERCENT end
+    if GetTime() < previewUntil then return PREVIEW_STATUS, PREVIEW_PERCENT, false end
     if not UnitDetailedThreatSituation then return end
-    local ok, _, status, scaledPercent = pcall(UnitDetailedThreatSituation, "player", unit)
+    local ok, isTanking, status, scaledPercent = pcall(UnitDetailedThreatSituation, "player", unit)
     if not ok then return end
     if Plain(status) and status == nil then return end
-    return status, scaledPercent
+    return status, scaledPercent, isTanking
+end
+
+-- Para /rcm debug: si el juego oculta el nivel y de dónde salió el color la última vez
+local colorInfo = { hidden = false, source = "-" }
+function ns.GetThreatColorInfo() return colorInfo end
+
+local function DBColor(key)
+    local c = ns.db[key]
+    return c[1], c[2], c[3], c[4] or 1
+end
+
+-- Pinta la barra. La textura de la barra acepta colores que el juego oculta (como el borde dorado); si no,
+-- se prueba con el color de la barra.
+local function Paint(meter, r, g, b, a)
+    local tex = meter.bar:GetStatusBarTexture()
+    if tex and pcall(tex.SetVertexColor, tex, r, g, b, a) then return true end
+    return pcall(meter.bar.SetStatusBarColor, meter.bar, r, g, b, a)
+end
+
+local function PaintColor(meter, color)
+    if not color then return false end
+    local ok, r, g, b, a = pcall(color.GetRGBA, color)
+    if not ok then return false end
+    if not Paint(meter, r, g, b, a) then return false end
+    if ns.db.threatTextUseColor then pcall(meter.text.SetTextColor, meter.text, r, g, b, 1) end
+    return true
+end
+
+local function PaintRGB(meter, r, g, b, a)
+    Paint(meter, r, g, b, a)
+    if ns.db.threatTextUseColor then pcall(meter.text.SetTextColor, meter.text, r, g, b, 1) end
 end
 
 -- En combate el juego oculta el nivel de amenaza (valor secreto): no se puede mirar, pero sí pasárselo a una
@@ -88,52 +120,75 @@ end
 -- uno tiene su color en un tramo plano de la curva.
 local statusCurve
 local function BuildStatusCurve()
-    statusCurve = nil
+    statusCurve = false
     if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return end
     local ok, curve = pcall(C_CurveUtil.CreateColorCurve)
     if not ok or not curve then return end
     for level = 0, 3 do
-        local c = ns.db[STATUS_KEYS[level]]
-        local color = CreateColor(c[1], c[2], c[3], c[4] or 1)
+        local color = CreateColor(DBColor(STATUS_KEYS[level]))
         curve:AddPoint(math.max(0, level - 0.45), color)
         curve:AddPoint(level + 0.45, color)
     end
     statusCurve = curve
 end
 
-local function StatusColor(status)
-    local db = ns.db
+local function PaintHiddenStatus(meter, status)
+    if statusCurve == nil then BuildStatusCurve() end
+    if not statusCurve then return false end
+    local ok, color = pcall(statusCurve.Evaluate, statusCurve, status)
+    return ok and PaintColor(meter, color)
+end
+
+-- Si el nivel no sirve: ¿te está atacando a ti? (rojo) o no (poca amenaza). El juego puede ocultar también
+-- ese dato; entonces se lo pasa a su función de color por verdadero/falso, sin mirarlo.
+local function PaintTanking(meter, isTanking)
+    if isTanking == nil and not ns.IsSecret(isTanking) then return false end
+    if Plain(isTanking) then
+        PaintRGB(meter, DBColor(isTanking and "threatColorTanking" or "threatColorLow"))
+        return true
+    end
+    local fromBool = C_CurveUtil and C_CurveUtil.EvaluateColorFromBoolean
+    if not (fromBool and CreateColor) then return false end
+    local ok, color = pcall(fromBool, isTanking, CreateColor(DBColor("threatColorTanking")),
+        CreateColor(DBColor("threatColorLow")))
+    return ok and PaintColor(meter, color)
+end
+
+-- Último recurso: si el enemigo te tiene a ti de objetivo, te está atacando
+local function PaintTarget(meter, unit)
+    if not UnitIsUnit then return false end
+    local ok, isPlayer = pcall(UnitIsUnit, unit .. "target", "player")
+    if not ok or not Plain(isPlayer) then return false end
+    PaintRGB(meter, DBColor(isPlayer and "threatColorTanking" or "threatColorLow"))
+    return true
+end
+
+local function PaintThreat(meter, unit, status, isTanking)
+    colorInfo.hidden = ns.IsSecret(status)
     if Plain(status) then
-        local c = db[STATUS_KEYS[status] or "threatColorSecret"]
-        return c[1], c[2], c[3], c[4] or 1
+        PaintRGB(meter, DBColor(STATUS_KEYS[status] or "threatColorSecret"))
+        colorInfo.source = "level"
+    elseif PaintHiddenStatus(meter, status) then
+        colorInfo.source = "curve"
+    elseif PaintTanking(meter, isTanking) then
+        colorInfo.source = "tanking"
+    elseif PaintTarget(meter, unit) then
+        colorInfo.source = "target"
+    else
+        PaintRGB(meter, DBColor("threatColorSecret"))
+        colorInfo.source = "hidden"
     end
-    if not statusCurve then BuildStatusCurve() end
-    if statusCurve then
-        local ok, color = pcall(statusCurve.Evaluate, statusCurve, status)
-        if ok and color then
-            local okRGBA, r, g, b, a = pcall(color.GetRGBA, color)
-            if okRGBA then return r, g, b, a end
-        end
-    end
-    local c = db.threatColorSecret
-    return c[1], c[2], c[3], c[4] or 1
 end
 
 local function UpdateMeter(unit)
     local meter = meters[unit]
     if not meter then return end
-    local db = ns.db
-    local status, percent = Threat(unit)
+    local status, percent, isTanking = Threat(unit)
     if not ns.IsSecret(status) and status == nil then
         meter:Hide()
         return
     end
-    local r, g, b, a = StatusColor(status)
-    if not pcall(meter.bar.SetStatusBarColor, meter.bar, r, g, b, a) then
-        local c = db.threatColorSecret
-        meter.bar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
-    end
-    if db.threatTextUseColor then pcall(meter.text.SetTextColor, meter.text, r, g, b, 1) end
+    PaintThreat(meter, unit, status, isTanking)
     -- Las barras y los textos aceptan los valores secretos tal cual: el addon nunca los lee
     local hasPercent = ns.IsSecret(percent) or percent ~= nil
     if not (hasPercent and pcall(meter.bar.SetValue, meter.bar, percent)) then meter.bar:SetValue(0) end
