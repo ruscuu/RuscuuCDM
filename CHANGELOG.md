@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.0
+
+**New**
+- **Effects**: new options page to control the buff and debuff icons the game draws. On enemy nameplates (mostly what you cast on them): show or hide, size and position. On the target frame: buffs and debuffs separately, their size, and the same on the focus frame. On you (next to the minimap): your buffs and your debuffs (curses, poisons...) separately. Buttons to Blizzard's panel that chooses which buffs and debuffs the Cooldown Manager tracks, and to Edit Mode.
+- **Hide any frame by its name**: put the mouse over it, type `/fstack`, and write its name on the Effects page or with `/rcm hide <name>`. Write it again to show it back.
+- The addon never reads the effects: it only hides, resizes or moves Blizzard's icons, so it also works in combat, and everything goes back to Blizzard's look when you set the defaults again.
+
 ## v0.8.0
 
 **New**

@@ -38,5 +38,6 @@ ActiveCooldowns.lua
 Minimap.lua
 ActionBars.lua
 Threat.lua
+Auras.lua
 Snapshots.lua
 Options.lua

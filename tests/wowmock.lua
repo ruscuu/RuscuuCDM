@@ -72,7 +72,14 @@ function Object:GetFrameStrata() return self._strata or (self._parent and self._
 function Object:GetNumPoints() return self._points and #self._points or 0 end
 function Object:SetTextColor(r, g, b, a) self._color = { r, g, b, a } end
 function Object:GetTextColor() if self._color then return unpack(self._color) end return 1, 1, 1, 1 end
-function Object:SetPoint(...) self._points = self._points or {}; self._points[#self._points + 1] = { ... } end
+-- Como en el juego: volver a usar el mismo punto de anclaje lo sustituye
+function Object:SetPoint(point, ...)
+    self._points = self._points or {}
+    for i, p in ipairs(self._points) do
+        if p[1] == point then self._points[i] = { point, ... }; return end
+    end
+    self._points[#self._points + 1] = { point, ... }
+end
 function Object:ClearAllPoints() self._points = {} end
 function Object:GetPoint(i) local p = self._points and self._points[i or 1]; if p then return unpack(p) end end
 function Object:SetScript(name, fn) self._scripts = self._scripts or {}; self._scripts[name] = fn end
