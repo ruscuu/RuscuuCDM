@@ -656,6 +656,7 @@ local function BuildGeneral(ui)
         "/rcm test  — " .. L["preview the golden border for 5 seconds"],
         "/rcm skin  — " .. L["reapply the style"],
         "/rcm minimap  — " .. L["show or hide the minimap button"],
+        "/rcm hide <" .. L["name"] .. ">  — " .. L["hide or show again any frame by its name (see /fstack)"],
         "/rcm debug  — " .. L["diagnostic information"],
         "/rcm reset  — " .. L["reset all settings"],
     }, "\n"))
@@ -920,6 +921,91 @@ local function BuildThreat(ui)
     ui:Color(1, L["Number color"], "threatTextColor", RefreshThreat)
     ui:DBCheck(2, L["Same color as the threat"], "threatTextUseColor", nil, RefreshThreat)
     ui:Next(30)
+end
+
+------------------------------------------------------------------------
+-- Página Efectos (iconos de beneficios y perjuicios del juego)
+------------------------------------------------------------------------
+
+local function RefreshAuras()
+    ns.RefreshAuras()
+end
+
+local function OpenEditMode()
+    if InCombatLockdown() then
+        ns.Print(L["Not available in combat."], true)
+        return
+    end
+    if EditModeManagerFrame then ShowUIPanel(EditModeManagerFrame) end
+end
+
+local function BuildAuras(ui)
+    local _, h = ui:Note(L["The game draws these icons; the addon never reads them, it only hides, resizes or moves them, so it also works in combat."])
+    ui:Next(h)
+
+    ui:Section(L["Tracked by the Cooldown Manager"])
+    local _, hc = ui:Note(L["The buffs and debuffs Blizzard's Cooldown Manager follows (for example, your damage over time on the target) are chosen in Blizzard's panel; move them and change their size in Edit Mode."])
+    ui:Next(hc)
+    ui:Button(1, L["Choose visible cooldowns"], 260, function() ns.OpenCooldownSettings() end,
+        L["Opens Blizzard's Advanced Cooldown Settings. Drag a buff or debuff to \"Not Displayed\" to hide it."])
+    ui:Button(2, L["Edit Mode"], 200, OpenEditMode, L["Move and resize Blizzard's frames, like the tracked buffs and your own buffs and debuffs."])
+    ui:Next(34)
+
+    ui:Section(L["On enemy nameplates"])
+    ui:DBCheck(1, L["Show effects on nameplates"], "aurasPlateShow",
+        L["The icons above each nameplate: mostly what you cast on that enemy, with the seconds left."], RefreshAuras)
+    ui:Next(30)
+    ui:Slider(1, L["Size"], "aurasPlateScale", 0.05, FormatPercent, RefreshAuras)
+    ui:Next(48)
+    ui:Slider(1, L["Horizontal position"], "aurasPlateX", 1, FormatNumber, RefreshAuras,
+        L["Distance from where the game puts them."])
+    ui:Slider(2, L["Vertical position"], "aurasPlateY", 1, FormatNumber, RefreshAuras,
+        L["Distance from where the game puts them."])
+    ui:Next(48)
+
+    ui:Section(L["Target frame"])
+    ui:DBCheck(1, L["Show buffs"], "aurasTargetBuffs", nil, RefreshAuras)
+    ui:DBCheck(2, L["Show debuffs"], "aurasTargetDebuffs",
+        L["Includes what you cast on your target."], RefreshAuras)
+    ui:Next(30)
+    ui:Slider(1, L["Size"], "aurasTargetScale", 0.05, FormatPercent, RefreshAuras)
+    ui:DBCheck(2, L["Same on the focus frame"], "aurasFocus", nil, RefreshAuras)
+    ui:Next(48)
+
+    ui:Section(L["On you"])
+    ui:DBCheck(1, L["Show your buffs"], "aurasPlayerBuffs",
+        L["The icons next to the minimap. Their position and size are in Edit Mode."], RefreshAuras)
+    ui:DBCheck(2, L["Show your debuffs"], "aurasPlayerDebuffs",
+        L["Curses, poisons and other effects enemies put on you. Their position and size are in Edit Mode."], RefreshAuras)
+    ui:Next(30)
+
+    ui:Section(L["Any other frame"])
+    local _, hn = ui:Note(L["To hide any other icon or frame: put the mouse over it, type /fstack, and write here the name it shows (for example TargetFrame). Write it again to show it back. Also: /rcm hide <name>."])
+    ui:Next(hn)
+    local box
+    box = ui:EditBox(1, L["Frame name"], function(text)
+        local name = strtrim(text or "")
+        if name == "" then return end
+        local hidden = ns.ToggleHiddenFrame(name)
+        if hidden == nil then
+            ns.Print(L["There is no frame called %s. Put the mouse over it and type /fstack to see its name."]:format(name), true)
+        else
+            ns.Print((hidden and L["%s hidden."] or L["%s shown again."]):format(name), true)
+            box:SetText("")
+        end
+        ns.RefreshOptions()
+    end, nil, L["Press Enter to hide it, or to show it again if it is already hidden."])
+    ui:Button(2, L["Show all again"], 200, function()
+        ns.ShowAllHiddenFrames()
+        ns.RefreshOptions()
+    end, nil, 0)
+    ui:Next(52)
+    local list = ui:Note("")
+    OnRefresh(function()
+        local names = ns.GetHiddenFrameNames()
+        list:SetText(#names > 0 and (L["Hidden: %s"]):format(table.concat(names, ", ")) or L["No hidden frames."])
+    end)
+    ui:Next(40)
 end
 
 ------------------------------------------------------------------------
@@ -1897,6 +1983,13 @@ local SUBPAGES = {
         resetKeys = { "threatBar", "threatShow", "threatWidth", "threatHeight", "threatX", "threatY", "threatFontSize",
             "threatTextPosition", "threatTextColor", "threatTextUseColor", "threatColorLow", "threatColorHigh",
             "threatColorInsecure", "threatColorTanking", "threatColorSecret", "threatBgColor" },
+    },
+    {
+        key = "auras", titleKey = "Effects", descKey = "Buff and debuff icons the game shows on nameplates, your target and you.",
+        build = BuildAuras,
+        resetKeys = { "aurasPlateShow", "aurasPlateScale", "aurasPlateX", "aurasPlateY", "aurasTargetBuffs",
+            "aurasTargetDebuffs", "aurasTargetScale", "aurasFocus", "aurasPlayerBuffs", "aurasPlayerDebuffs",
+            "aurasHideFrames" },
     },
     {
         key = "interface", titleKey = "Interface", descKey = "Save and restore your frame positions, keybindings and action bars.",

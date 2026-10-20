@@ -14,6 +14,7 @@ It only changes how things look — it never reads combat data, so it follows Fo
 - **Golden border** during the last seconds of a cooldown, on action buttons and Cooldown Manager icons: seconds, color, thickness, glow and blink style/speed — and you choose which spells get it.
 - **Border when a buff is about to end**, on the Cooldown Manager's buff icons and bars.
 - **Threat meter on enemy nameplates**: a thin bar above each enemy you fight that fills with your threat and turns yellow, orange and red as you get close to pulling it.
+- **Effects**: control the buff and debuff icons the game draws: on enemy nameplates (show, size, position), on the target and focus frames (buffs and debuffs separately, size) and on you (your buffs and your debuffs, like curses). Hide any other frame by the name `/fstack` shows.
 - **Choose which cooldowns are shown** through Blizzard's own Advanced Cooldown Settings, one click away.
 - **Cooldown numbers** on the Cooldown Manager and action bars: font, size, outline and color for every text.
 - Works with **Bartender4, Dominos and ElvUI** action bars.
@@ -35,6 +36,7 @@ It only changes how things look — it never reads combat data, so it follows Fo
 | `/rcm skin` | Reapply the style |
 | `/rcm minimap` | Show or hide the minimap button |
 | `/rcm ui` | Save or restore your interface (positions, keybindings, action bars) |
+| `/rcm hide <name>` | Hide or show again any frame by its name (see `/fstack`) |
 | `/rcm debug` | Diagnostic information |
 | `/rcm reset` | Reset all settings (asks first) |
 
@@ -54,6 +56,7 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 - **Borde dorado** en los últimos segundos de un cooldown, en los botones de acción y en los iconos del Cooldown Manager: segundos, color, grosor, resplandor y tipo/velocidad de parpadeo; y eliges a qué hechizos se aplica.
 - **Borde cuando un buff va a terminar**, en los iconos y barras de buffs del Cooldown Manager.
 - **Medidor de amenaza en las placas de enemigos**: una barra fina encima de cada enemigo con el que luchas que se llena con tu amenaza y se pone amarilla, naranja y roja cuando estás a punto de quitarle el objetivo al tanque.
+- **Efectos**: controla los iconos de beneficios y perjuicios que dibuja el juego: en las placas de los enemigos (mostrar, tamaño, posición), en los marcos del objetivo y del foco (beneficios y perjuicios por separado, tamaño) y en ti (tus beneficios y tus perjuicios, como las maldiciones). Oculta cualquier otro marco por el nombre que muestra `/fstack`.
 - **Elige qué cooldowns se muestran** desde el panel de Ajustes avanzados de habilidades de Blizzard, a un clic.
 - **Números de cooldown** en el Cooldown Manager y en las barras de acción: fuente, tamaño, contorno y color de cada texto.
 - Funciona con las barras de **Bartender4, Dominos y ElvUI**.
@@ -75,6 +78,7 @@ Solo cambia la apariencia; no lee datos de combate, así que respeta las restric
 | `/rcm skin` | Reaplica el estilo |
 | `/rcm minimap` | Muestra u oculta el botón del minimapa |
 | `/rcm ui` | Guarda o restaura tu interfaz (posiciones, teclas, barras de acción) |
+| `/rcm hide <nombre>` | Oculta o vuelve a mostrar cualquier marco por su nombre (ver `/fstack`) |
 | `/rcm debug` | Información de diagnóstico |
 | `/rcm reset` | Borra toda la configuración (pide confirmación) |
 

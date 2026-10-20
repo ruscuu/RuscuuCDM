@@ -13,7 +13,7 @@ assert(ns.GetSpellHotkey(100) == "1", "tecla del hechizo tras iniciar sesión")
 
 -- Páginas de opciones: empiezan ocultas y se construyen la primera vez que se muestran
 -- (si empezaran visibles, la primera vez saldrían en blanco)
-assert(#pages == 11, "páginas registradas: " .. #pages)
+assert(#pages == 12, "páginas registradas: " .. #pages)
 for i, page in ipairs(pages) do
     assert(not page:IsShown(), "la página " .. i .. " debe empezar oculta")
     page._width = 640
@@ -68,10 +68,14 @@ M.Tick(0.2)
 ns.db.activeAdd = { [50] = true, [642] = true }
 ns.db.activeRemove = { [100] = true }
 ns.db.activeSize = 52
+ns.db.aurasHideFrames = { Some_Frame = true }
+ns.db.aurasPlateScale = 1.5
 local text = ns.ExportProfile()
 ns.db.keybindAnchor = "BOTTOMLEFT"; ns.db.buffEndGlow = true; ns.db.bars.addons = false
 ns.db.activeAdd, ns.db.activeRemove, ns.db.activeSize = {}, {}, 40
+ns.db.aurasHideFrames, ns.db.aurasPlateScale = {}, 1
 local ok = ns.ImportProfile(text)
+assert(ns.db.aurasHideFrames.Some_Frame and ns.db.aurasPlateScale == 1.5, "importar recupera los iconos de efectos")
 assert(ok and ns.db.keybindAnchor == "TOPRIGHT" and ns.db.buffEndGlow == false and ns.db.bars.addons == true,
     "importar recupera las opciones nuevas")
 assert(ns.db.activeAdd[50] and ns.db.activeAdd[642] and ns.db.activeRemove[100] and ns.db.activeSize == 52,

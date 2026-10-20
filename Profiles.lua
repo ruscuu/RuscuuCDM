@@ -90,6 +90,7 @@ function ns.RefreshAll()
     ns.SkinAll()
     ns.StyleActionBars()
     if ns.RefreshThreat then ns.RefreshThreat() end
+    if ns.RefreshAuras then ns.RefreshAuras() end
     if ns.RefreshOptions then ns.RefreshOptions() end
 end
 
@@ -321,7 +322,7 @@ local PREFIX = "!RUSCUU:1!"
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local SPELL_SET_KEYS = { expireExclude = true, activeAdd = true, activeRemove = true, activeItems = true }
 -- Claves de texto: una lista con orden ("a,b,c") o un conjunto ([clave] = true)
-local KEY_LISTS = { activeOrder = "list", activeSound = "set" } -- conjuntos de hechizos: se exportan como "123,456"
+local KEY_LISTS = { activeOrder = "list", activeSound = "set", aurasHideFrames = "set" } -- conjuntos de hechizos: se exportan como "123,456"
 
 local function B64Char(n)
     return B64:sub(n + 1, n + 1)
@@ -376,11 +377,11 @@ local function Flatten(defaults, values, prefix, out)
             local words = {}
             if KEY_LISTS[key] == "list" then
                 for _, w in ipairs(type(v) == "table" and v or {}) do
-                    if type(w) == "string" and w:match("^%w+$") then words[#words + 1] = w end
+                    if type(w) == "string" and w:match("^[%w_]+$") then words[#words + 1] = w end
                 end
             else
                 for w, on in pairs(type(v) == "table" and v or {}) do
-                    if on and type(w) == "string" and w:match("^%w+$") then words[#words + 1] = w end
+                    if on and type(w) == "string" and w:match("^[%w_]+$") then words[#words + 1] = w end
                 end
                 table.sort(words)
             end
@@ -427,9 +428,9 @@ end
 -- Escribe un valor importado si la clave existe en los valores por defecto y el valor es válido
 local function ImportValue(target, key, raw)
     if KEY_LISTS[key] then
-        if not raw:match("^[%w,]*$") then return false end
+        if not raw:match("^[%w_,]*$") then return false end
         local value = {}
-        for w in raw:gmatch("%w+") do
+        for w in raw:gmatch("[%w_]+") do
             if KEY_LISTS[key] == "list" then value[#value + 1] = w else value[w] = true end
         end
         target[key] = value

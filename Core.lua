@@ -222,6 +222,19 @@ ns.PROFILE_DEFAULTS = {
     threatColorSecret = { 0.61, 0.3, 1, 1 },  -- el juego oculta el dato
     threatBgColor = { 0, 0, 0, 0.6 },
 
+    -- Iconos de efectos que dibuja el juego (Auras.lua): por defecto todo como lo deja Blizzard
+    aurasPlateShow = true,                    -- efectos encima de las placas de nombre (lo que aplicas al enemigo)
+    aurasPlateScale = 1,
+    aurasPlateX = 0,                          -- desplazamiento desde donde los pone Blizzard
+    aurasPlateY = 0,
+    aurasTargetBuffs = true,                  -- beneficios junto al marco del objetivo
+    aurasTargetDebuffs = true,                -- perjuicios junto al marco del objetivo
+    aurasTargetScale = 1,
+    aurasFocus = true,                        -- lo mismo en el marco del foco
+    aurasPlayerBuffs = true,                  -- tus beneficios (arriba a la derecha)
+    aurasPlayerDebuffs = true,                -- tus perjuicios: maldiciones, venenos...
+    aurasHideFrames = {},                     -- [nombre] = true: otros marcos ocultos por su nombre
+
     -- Borde dorado cuando un cooldown está terminando
     expireGlow = true,
     expireOnCDM = true,
@@ -267,6 +280,10 @@ ns.LIMITS = {
     threatX = { -150, 150 },
     threatY = { -100, 100 },
     threatFontSize = { 6, 30 },
+    aurasPlateScale = { 0.5, 2 },
+    aurasPlateX = { -100, 100 },
+    aurasPlateY = { -100, 100 },
+    aurasTargetScale = { 0.5, 2 },
 }
 
 -- Valores permitidos para las opciones de lista (los usa la importación)
@@ -577,6 +594,7 @@ function ns.PrintHelp()
     print("  /rcm skin  — " .. L["reapply the style"])
     print("  /rcm minimap  — " .. L["show or hide the minimap button"])
     print("  /rcm ui  — " .. L["save or restore your interface (positions, keybindings, action bars)"])
+    print("  /rcm hide <" .. L["name"] .. ">  — " .. L["hide or show again any frame by its name (see /fstack)"])
     print("  /rcm debug  — " .. L["diagnostic information"])
     print("  /rcm reset  — " .. L["reset all settings"])
 end
@@ -584,8 +602,19 @@ end
 SLASH_RUSCUUCDM1 = "/rcm"
 SLASH_RUSCUUCDM2 = "/rcmf"
 SlashCmdList.RUSCUUCDM = function(msg)
-    msg = strtrim(msg or ""):lower()
-    if msg == "reset" then
+    msg = strtrim(msg or "")
+    -- Los nombres de los marcos distinguen mayúsculas: se leen antes de pasar el comando a minúsculas
+    local frameName = msg:match("^[Hh][Ii][Dd][Ee]%s+(%S+)$")
+    msg = msg:lower()
+    if frameName then
+        local hidden = ns.ToggleHiddenFrame(frameName)
+        if hidden == nil then
+            ns.Print(L["There is no frame called %s. Put the mouse over it and type /fstack to see its name."]:format(frameName), true)
+        else
+            ns.Print((hidden and L["%s hidden."] or L["%s shown again."]):format(frameName), true)
+        end
+        if ns.RefreshOptions then ns.RefreshOptions() end
+    elseif msg == "reset" then
         ns.ShowPopup("RUSCUUCDM_RESET_ALL")
     elseif msg == "skin" then
         ns.RefreshAll()
@@ -675,6 +704,12 @@ function ns.Debug()
     if ns.GetThreatColorInfo then
         local t = ns.GetThreatColorInfo()
         ns.Print(L["Threat meter: level hidden by the game %s, color from: %s"]:format(t.hidden and yes or no, t.source), true)
+    end
+    if ns.GetAuraStatus then
+        local a = ns.GetAuraStatus()
+        ns.Print(L["Effect icons: nameplates %d, target frame %s (%d icons), your buffs %s, your debuffs %s, hidden frames %d"]:format(
+            a.plates, a.target and yes or no, a.targetButtons, a.playerBuffs and yes or no, a.playerDebuffs and yes or no,
+            a.hidden), true)
     end
     ns.Print(L["Active profile: %s"]:format(ns.activeProfile), true)
 end
