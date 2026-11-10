@@ -52,7 +52,8 @@ ns.RenameProfile("Sacerdote", "Mi sacerdote")
 assert(ns.global.classProfiles.PRIEST == "Mi sacerdote", "renombrado")
 assert(ns.ProfileForSpec(2) == "Mi sacerdote", "la especialización sigue en el perfil renombrado")
 ns.DeleteProfile("Mi sacerdote")
-assert(ns.global.classProfiles.PRIEST == nil and ns.activeProfile == "Default", "borrado")
+-- La clase queda apuntando a Default: así el perfil borrado no vuelve a crearse al entrar de nuevo
+assert(ns.global.classProfiles.PRIEST == "Default" and ns.activeProfile == "Default", "borrado")
 
 -- Si el juego no deja saber qué hechizos conoce, no se quita nada
 IsPlayerSpell = nil

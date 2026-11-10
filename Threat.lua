@@ -15,6 +15,12 @@ local PREVIEW_STATUS, PREVIEW_PERCENT = 1, 85
 local meters = {}  -- unidad de la placa -> medidor
 local spare = {}   -- medidores sin usar, para no crear uno nuevo por cada placa
 local previewUntil = 0
+-- Marco de eventos y de la revisión periódica; solo se muestra (y corre su OnUpdate) si hay medidores
+local events = CreateFrame("Frame")
+
+local function UpdatePolling()
+    events:SetShown(next(meters) ~= nil)
+end
 
 local function Plain(value)
     return not ns.IsSecret(value)
@@ -71,6 +77,7 @@ local function ReleaseMeter(unit)
     meter.anchor = nil
     meters[unit] = nil
     spare[#spare + 1] = meter
+    UpdatePolling()
 end
 
 -- Amenaza del jugador sobre la unidad: nil si no está en su lista de amenaza.
@@ -142,7 +149,8 @@ end
 -- Si el nivel no sirve: ¿te está atacando a ti? (rojo) o no (poca amenaza). El juego puede ocultar también
 -- ese dato; entonces se lo pasa a su función de color por verdadero/falso, sin mirarlo.
 local function PaintTanking(meter, isTanking)
-    if isTanking == nil and not ns.IsSecret(isTanking) then return false end
+    -- Primero si es secreto: comparar un valor secreto (también con ==) da error
+    if Plain(isTanking) and isTanking == nil then return false end
     if Plain(isTanking) then
         PaintRGB(meter, DBColor(isTanking and "threatColorTanking" or "threatColorLow"))
         return true
@@ -216,6 +224,7 @@ local function AddPlate(unit)
     meter.anchor = anchor.name or anchor.Name or anchor
     StyleMeter(meter)
     meters[unit] = meter
+    UpdatePolling()
     UpdateMeter(unit)
 end
 
@@ -265,22 +274,35 @@ function ns.CountThreatMeters()
     return n
 end
 
-local events = CreateFrame("Frame")
 for _, event in ipairs({ "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "UNIT_THREAT_LIST_UPDATE",
     "UNIT_THREAT_SITUATION_UPDATE", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED" }) do
     pcall(events.RegisterEvent, events, event)
 end
-events:SetScript("OnEvent", function(_, event, unit)
-    if not ns.db then return end
+events:Hide()
+
+-- Los avisos de amenaza de otras unidades (objetivo, jefe, grupo) no cambian nada que la revisión periódica
+-- no recoja: solo se rehace todo al entrar o salir de combate o si cambia tu propia situación
+local function OnThreatEvent(event, unit)
     if event == "NAME_PLATE_UNIT_ADDED" then
         AddPlate(unit)
     elseif event == "NAME_PLATE_UNIT_REMOVED" then
         ReleaseMeter(unit)
-    elseif unit and meters[unit] then
+    elseif Plain(unit) and unit and meters[unit] then
         UpdateMeter(unit)
-    else
-        for u in pairs(meters) do UpdateMeter(u) end
+    elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED"
+        or (Plain(unit) and unit == "player") then
+        for u in pairs(meters) do
+            local ok, err = pcall(UpdateMeter, u)
+            if not ok then ns.ReportError(err) end
+        end
     end
+end
+
+-- Estos eventos llegan muchas veces por segundo en combate: un error se informa una sola vez
+events:SetScript("OnEvent", function(_, event, unit)
+    if not ns.db then return end
+    local ok, err = pcall(OnThreatEvent, event, unit)
+    if not ok then ns.ReportError(err) end
 end)
 
 -- La amenaza cambia con cada golpe: se revisa varias veces por segundo mientras haya medidores
@@ -289,5 +311,8 @@ events:SetScript("OnUpdate", function(_, elapsed)
     since = since + elapsed
     if since < UPDATE_INTERVAL then return end
     since = 0
-    for unit in pairs(meters) do pcall(UpdateMeter, unit) end
+    for unit in pairs(meters) do
+        local ok, err = pcall(UpdateMeter, unit)
+        if not ok then ns.ReportError(err) end
+    end
 end)

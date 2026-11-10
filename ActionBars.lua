@@ -15,6 +15,7 @@ local hookedCount = 0
 local original = setmetatable({}, { __mode = "k" })     -- cooldown -> fuente original de Blizzard
 local styled = setmetatable({}, { __mode = "k" })       -- cooldown -> versión del estilo aplicada
 local version = 0
+local hotkeysDirty = true                                -- las teclas de los hechizos están por recalcular
 
 local function BarEnabled(barKey)
     return ns.db.bars[barKey] ~= false
@@ -215,6 +216,7 @@ end
 
 -- Se puede llamar varias veces: solo engancha los botones nuevos
 function ns.HookActionBars()
+    local before = hookedCount
     for _, group in ipairs(ns.ACTION_BARS) do
         if group.prefix then
             for i = 1, 12 do
@@ -224,6 +226,9 @@ function ns.HookActionBars()
     end
     HookAddonButtons()
     ns.StyleActionBars()
+    -- Botones creados tarde (al añadir una barra de Bartender4...): sus teclas también cuentan. Si las teclas
+    -- aún no se calcularon, ya hay un cálculo pendiente que los incluirá.
+    if hookedCount ~= before and not hotkeysDirty and ns.QueueHotkeyRebuild then ns.QueueHotkeyRebuild() end
 end
 
 function ns.CountActionCooldowns()
@@ -272,7 +277,6 @@ local SLOT_COMMANDS = {
 }
 
 local hotkeyBySpell = {}
-local hotkeysDirty = true
 local rebuildQueued = false
 
 -- Texto corto de la tecla asignada a un comando ("1", "s-Q", "M4"...), como en los botones de Blizzard
@@ -347,6 +351,20 @@ local function RebuildHotkeys()
                 local spellID = ActionSpellID(action)
                 local text = spellID and CommandHotkey(range.command .. ((action - range.first) % 12 + 1))
                 if text then AddSpellHotkey(spellID, text) end
+            end
+        end
+    end
+    -- 3) Botones de addons ocultos fuera de combate (barras que solo salen en combate o que se usan solo con
+    -- teclas): fuera de combate no se ven, y sus teclas son de tipo CLICK, que el paso 2 no conoce
+    for _, info in ipairs(buttonList) do
+        local button = info.button
+        if not info.noActionSlot and info.bar == "addons" and button:IsVisible() ~= true then
+            local action = ActionSlot(button)
+            if action and SlotHasAction(action) then
+                local spellID = ActionSpellID(action)
+                local ok, text = false, nil
+                if spellID then ok, text = pcall(ButtonHotkey, button) end
+                if ok and text then AddSpellHotkey(spellID, text) end
             end
         end
     end

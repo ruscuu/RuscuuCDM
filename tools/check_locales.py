@@ -15,7 +15,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STRING = r'"((?:[^"\\]|\\.)*)"'
-FORMAT = re.compile(r"%[-+#0]*\d*(?:\.\d+)?[sdfgx%]")
+# Sin el indicador " " (espacio): en el texto "0% shows" se leería como %s
+FORMAT = re.compile(r"%[-+#0]*\d*(?:\.\d+)?[sdifgxXcq%]")
 
 
 def unescape(text):
@@ -42,22 +43,24 @@ def used_keys():
 
 
 def locale_tables():
+    """Devuelve (tablas, repetidas): una clave repetida es un error porque en Lua gana la última en silencio."""
     tables = {}
+    duplicates = 0
     for path in sorted(glob.glob(os.path.join(ROOT, "Locales", "*.lua"))):
         entries = {}
         for key, value in re.findall(r"^L\[" + STRING + r"\]\s*=\s*" + STRING, read(path), re.M):
             key = unescape(key)
             if key in entries:
                 print(f"{os.path.basename(path)}: traducción repetida: {key!r}")
+                duplicates += 1
             entries[key] = unescape(value)
         tables[os.path.basename(path)] = entries
-    return tables
+    return tables, duplicates
 
 
 def main():
     used = used_keys()
-    errors = 0
-    tables = locale_tables()
+    tables, errors = locale_tables()
     if not tables:
         print("No hay archivos en Locales/")
         return 1

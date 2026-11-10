@@ -11,7 +11,10 @@ local _, ns = ...
 
 local MAX_AURA_BUTTONS = 40
 -- Partes del contenedor de efectos de las placas en las versiones nuevas del juego (si no, se usa el contenedor)
-local PLATE_LISTS = { "DebuffListFrame", "BuffListFrame", "CrowdControlListFrame" }
+-- LossOfControlFrame: el icono de aturdimiento, polimorfia... junto a la barra de vida
+local PLATE_LISTS = { "DebuffListFrame", "BuffListFrame", "CrowdControlListFrame", "LossOfControlFrame" }
+-- Blizzard le pone su propia escala en cada actualización (RefreshLossOfControl): solo se oculta y se mueve
+local PLATE_NO_SCALE = { LossOfControlFrame = true }
 -- Funciones de Blizzard que vuelven a colocar los efectos de una placa: después de ellas se aplica lo elegido
 local PLATE_HOOKS = { "UpdateAnchor", "UpdateBuffs", "Layout", "RefreshList", "RefreshAuras" }
 local UNIT_FRAMES = { target = "TargetFrame", focus = "FocusFrame" }
@@ -51,12 +54,13 @@ local function SetVisible(frame, visible, mouse)
     if s.alpha == nil then
         local ok, alpha = pcall(frame.GetAlpha, frame)
         s.alpha = (ok and Plain(alpha) and alpha and alpha > 0) and alpha or 1
-        if mouse and frame.IsMouseEnabled and not (frame.IsProtected and frame:IsProtected()) then
-            local okMouse, enabled = pcall(frame.IsMouseEnabled, frame)
-            if okMouse and Plain(enabled) then
-                s.mouse = enabled and true or false
-                pcall(frame.EnableMouse, frame, false)
-            end
+    end
+    -- Aparte de la opacidad: otra opción pudo ocultarlo antes sin quitarle el ratón
+    if mouse and s.mouse == nil and frame.IsMouseEnabled and not (frame.IsProtected and frame:IsProtected()) then
+        local okMouse, enabled = pcall(frame.IsMouseEnabled, frame)
+        if okMouse and Plain(enabled) then
+            s.mouse = enabled and true or false
+            pcall(frame.EnableMouse, frame, false)
         end
     end
     pcall(frame.SetAlpha, frame, 0)
@@ -80,23 +84,60 @@ local function SetRelativeScale(frame, scale)
     pcall(frame.SetScale, frame, s.scale * scale)
 end
 
--- Desplazamiento desde el lugar donde Blizzard lo puso. Si Blizzard lo vuelve a colocar, ese es el nuevo origen.
+-- Todos los anclajes del marco: { {punto, relativo, puntoRel, x, y}, ... }, o nil si alguno es secreto
+local function ReadPoints(frame)
+    local okN, n = pcall(frame.GetNumPoints, frame)
+    if not okN or not Plain(n) or type(n) ~= "number" or n < 1 then return end
+    local points = {}
+    for i = 1, n do
+        local ok, point, rel, relPoint, x, y = pcall(frame.GetPoint, frame, i)
+        -- Primero si es secreto: ni siquiera "not point" se puede hacer con un valor secreto
+        if not ok or not (Plain(point) and Plain(rel) and Plain(relPoint) and Plain(x) and Plain(y)) or not point then
+            return
+        end
+        points[i] = { point, rel, relPoint, x or 0, y or 0 }
+    end
+    return points
+end
+
+local function FindPoint(points, name)
+    for _, p in ipairs(points or {}) do
+        if p[1] == name then return p end
+    end
+end
+
+local function SamePoint(a, b)
+    return a ~= nil and b ~= nil and a[1] == b[1] and a[2] == b[2] and a[3] == b[3] and a[4] == b[4] and a[5] == b[5]
+end
+
+-- Desplazamiento desde el lugar donde Blizzard lo puso. Se mueven todos los anclajes: con dos (la lista de
+-- perjuicios va a la IZQUIERDA y ABAJO), mover solo uno la estira en vez de moverla. Si Blizzard vuelve a
+-- colocar alguno, ese es su nuevo origen; los demás conservan el suyo.
 local function SetOffset(frame, dx, dy)
     local s = saved[frame]
-    local ok, point, rel, relPoint, x, y = pcall(frame.GetPoint, frame, 1)
-    if not ok or not point or not (Plain(x) and Plain(y)) then return end
-    x, y = x or 0, y or 0
     if dx == 0 and dy == 0 and not (s and s.base) then return end
+    local current = ReadPoints(frame)
+    if not current then return end
     s = State(frame)
-    local b = s.base
-    if not b or x ~= s.setX or y ~= s.setY or rel ~= b[2] or point ~= b[1] then
-        b = { point, rel, relPoint, x, y }
-        s.base = b
+    local base = {}
+    for i, c in ipairs(current) do
+        local old = FindPoint(s.base, c[1])
+        base[i] = (old and SamePoint(c, FindPoint(s.applied, c[1]))) and old or c
     end
-    local nx, ny = b[4] + dx, b[5] + dy
-    if nx ~= x or ny ~= y then pcall(frame.SetPoint, frame, b[1], b[2], b[3], nx, ny) end
-    s.setX, s.setY = nx, ny
-    if dx == 0 and dy == 0 then s.base = nil end
+    local target, changed = {}, false
+    for i, b in ipairs(base) do
+        target[i] = { b[1], b[2], b[3], b[4] + dx, b[5] + dy }
+        if not SamePoint(target[i], current[i]) then changed = true end
+    end
+    if changed then
+        pcall(frame.ClearAllPoints, frame)
+        for _, t in ipairs(target) do pcall(frame.SetPoint, frame, t[1], t[2], t[3], t[4], t[5]) end
+    end
+    if dx == 0 and dy == 0 then
+        s.base, s.applied = nil, nil
+    else
+        s.base, s.applied = base, target
+    end
 end
 
 ------------------------------------------------------------------------
@@ -104,6 +145,7 @@ end
 ------------------------------------------------------------------------
 
 local plateHooked = setmetatable({}, { __mode = "k" })
+local plateNoScale = setmetatable({}, { __mode = "k" })
 local platesFound = 0  -- para /rcm debug: placas en las que se encontraron los efectos
 
 -- Marcos de efectos de una placa: las listas de las versiones nuevas o el contenedor de siempre
@@ -114,7 +156,10 @@ local function PlateAuraFrames(plate)
     if not container then return {} end
     local lists = {}
     for _, key in ipairs(PLATE_LISTS) do
-        if type(container[key]) == "table" then lists[#lists + 1] = container[key] end
+        if type(container[key]) == "table" then
+            lists[#lists + 1] = container[key]
+            if PLATE_NO_SCALE[key] then plateNoScale[container[key]] = true end
+        end
     end
     if #lists == 0 then lists[1] = container end
     return lists
@@ -123,8 +168,14 @@ end
 local function StylePlateFrame(frame)
     local db = ns.db
     if not db then return end
+    -- Con todo por defecto y nada que devolver no hay trabajo (se llama muchas veces por segundo en combate)
+    local s = saved[frame]
+    if db.aurasPlateShow and db.aurasPlateScale == 1 and db.aurasPlateX == 0 and db.aurasPlateY == 0
+        and not (s and (s.alpha ~= nil or s.scale or s.base)) then
+        return
+    end
     SetVisible(frame, db.aurasPlateShow)
-    SetRelativeScale(frame, db.aurasPlateScale)
+    if not plateNoScale[frame] then SetRelativeScale(frame, db.aurasPlateScale) end
     SetOffset(frame, db.aurasPlateX, db.aurasPlateY)
 end
 
@@ -138,11 +189,33 @@ local function HookPlateFrame(frame)
     end
 end
 
+-- El icono de pérdida de control no tiene Layout propio: Blizzard lo recoloca desde la placa
+-- (UpdateAnchors) y desde su contenedor (RefreshLossOfControl), así que se vuelve a aplicar después
+local function HookLossOfControl(plate)
+    local uf = plate and plate.UnitFrame
+    local container = uf and (uf.AurasFrame or uf.BuffFrame or uf.aurasFrame)
+    local loc = container and container.LossOfControlFrame
+    if type(loc) ~= "table" then return end
+    local function restyle() pcall(StylePlateFrame, loc) end
+    if type(uf.UpdateAnchors) == "function" then hooksecurefunc(uf, "UpdateAnchors", restyle) end
+    if type(container.RefreshLossOfControl) == "function" then
+        hooksecurefunc(container, "RefreshLossOfControl", restyle)
+    end
+end
+
+-- Placas cuyo icono de pérdida de control ya está enganchado (una sola vez por placa)
+local locHooked = setmetatable({}, { __mode = "k" })
+
 local function StylePlate(plate)
     local frames = PlateAuraFrames(plate)
     for _, frame in ipairs(frames) do
         HookPlateFrame(frame)
         StylePlateFrame(frame)
+    end
+    local uf = plate and plate.UnitFrame
+    if uf and not locHooked[uf] then
+        locHooked[uf] = true
+        HookLossOfControl(plate)
     end
     return #frames > 0
 end
@@ -192,12 +265,28 @@ local function UnitAuraButtons(frame, name)
     return list
 end
 
+-- Versiones nuevas: los efectos van en un contenedor (GetAuraContainer) con sus botones en grupos privados.
+-- No se pueden separar beneficios y perjuicios: se oculta el contenedor entero si ambos están desmarcados.
+local function UnitAuraContainer(frame)
+    if type(frame.GetAuraContainer) ~= "function" then return end
+    local ok, container = pcall(frame.GetAuraContainer, frame)
+    if ok and type(container) == "table" then return container end
+end
+
 local function StyleUnitFrame(unit)
     local db = ns.db
     local name = UNIT_FRAMES[unit]
     local frame = name and _G[name]
     if not (db and frame) then return 0 end
     local apply = unit == "target" or db.aurasFocus
+    local container = UnitAuraContainer(frame)
+    if container then
+        -- Nunca se escriben campos en el marco de Blizzard (contaminaría ConfigureAuraContainer)
+        SetVisible(container, not apply or db.aurasTargetBuffs or db.aurasTargetDebuffs, false)
+        SetRelativeScale(container, apply and db.aurasTargetScale or 1)
+        -- Para /rcm debug: 1 si el contenedor se deja tocar, 0 si está protegido
+        return pcall(container.GetAlpha, container) and 1 or 0
+    end
     local buttons = UnitAuraButtons(frame, name)
     for _, entry in ipairs(buttons) do
         local button, isDebuff = entry[1], entry[2]
@@ -247,14 +336,70 @@ local function StylePlayerButton(buttonName, index)
     end
 end
 
+-- Marcos ocultos por su nombre (marco -> true): mandan sobre las demás opciones
+local hiddenFrames = setmetatable({}, { __mode = "k" })
+
+-- Botones de efectos de BuffFrame/DebuffFrame: con opacidad 0 siguen recibiendo el ratón, y un clic
+-- derecho invisible quitaría un beneficio (CancelUnitBuff). Se les quita el ratón mientras están ocultos.
+local function AuraChildren(frame)
+    local list, seen = {}, {}
+    local function Add(child)
+        if type(child) == "table" and not seen[child] then
+            seen[child] = true
+            list[#list + 1] = child
+        end
+    end
+    if type(frame.auraFrames) == "table" then
+        for _, child in ipairs(frame.auraFrames) do Add(child) end
+    end
+    local container = frame.AuraContainer
+    if type(container) == "table" and container.GetChildren then
+        local ok, children = pcall(function() return { container:GetChildren() } end)
+        if ok then
+            for _, child in ipairs(children) do Add(child) end
+        end
+    end
+    return list
+end
+
+local function SetAuraMouse(frame, enabled)
+    for _, child in ipairs(AuraChildren(frame)) do
+        local okP, protected = false, nil
+        if child.IsProtected then okP, protected = pcall(child.IsProtected, child) end
+        local isProtected = okP and (not Plain(protected) or protected)
+        if not isProtected and child.EnableMouse then
+            local s = saved[child]
+            if enabled then
+                if s and s.childMouse ~= nil then
+                    pcall(child.EnableMouse, child, s.childMouse)
+                    s.childMouse = nil
+                end
+            else
+                s = State(child)
+                if s.childMouse == nil and child.IsMouseEnabled then
+                    local ok, on = pcall(child.IsMouseEnabled, child)
+                    if ok and Plain(on) then s.childMouse = on and true or false end
+                end
+                if s.childMouse ~= nil then pcall(child.EnableMouse, child, false) end
+            end
+        end
+    end
+end
+
 local function StylePlayer()
     local db = ns.db
     if not db then return end
     local buffs, debuffs = _G.BuffFrame, _G.DebuffFrame
     if debuffs then
         -- Versiones nuevas: un marco para cada cosa
-        if buffs then SetVisible(buffs, db.aurasPlayerBuffs) end
-        SetVisible(debuffs, db.aurasPlayerDebuffs)
+        if buffs then
+            local show = db.aurasPlayerBuffs and not hiddenFrames[buffs]
+            SetVisible(buffs, show)
+            SetAuraMouse(buffs, show)
+        end
+        local show = db.aurasPlayerDebuffs and not hiddenFrames[debuffs]
+        SetVisible(debuffs, show)
+        SetAuraMouse(debuffs, show)
     else
         -- Estilo clásico: los perjuicios van dentro del marco de beneficios, botón a botón
         for i = 1, MAX_AURA_BUTTONS do
@@ -294,22 +439,28 @@ local function StyleNamedFrames()
         if not list[name] then
             SetVisible(frame, true)
             hiddenByName[name] = nil
+            hiddenFrames[frame] = nil
         end
     end
     for name, on in pairs(list) do
         local frame = on and ns.FindFrameByName(name)
         if frame then
             hiddenByName[name] = frame
-            SetVisible(frame, false)
+            hiddenFrames[frame] = true
+            -- También sin ratón: invisible pero bloqueando clics y mostrando ayudas (los protegidos no se tocan)
+            SetVisible(frame, false, true)
             if not shownHooked[frame] and frame.HookScript then
                 shownHooked[frame] = true
                 -- Algunos marcos vuelven a ponerse visibles al mostrarse: se ocultan otra vez
                 pcall(frame.HookScript, frame, "OnShow", function(self)
-                    if hiddenByName[name] == self then SetVisible(self, false) end
+                    if hiddenByName[name] == self then SetVisible(self, false, true) end
                 end)
             end
         end
     end
+    -- BuffFrame/DebuffFrame: al dejar de ocultarlos por su nombre vuelven a mandar sus opciones
+    -- (y sus botones pierden o recuperan el ratón)
+    pcall(StylePlayer)
 end
 
 -- Oculta o vuelve a mostrar un marco por su nombre; devuelve true si ahora está oculto, o nil si no existe
@@ -356,12 +507,19 @@ function ns.RefreshAuras()
     pcall(StyleNamedFrames)
 end
 
+-- Contenedor nuevo: 1 si se deja tocar, 0 si no; si no, los botones encontrados
+local function TargetAuraCount(frame)
+    local container = UnitAuraContainer(frame)
+    if container then return pcall(container.GetAlpha, container) and 1 or 0 end
+    return #UnitAuraButtons(frame, "TargetFrame")
+end
+
 -- Para /rcm debug: qué se encontró de cada cosa
 function ns.GetAuraStatus()
     return {
         plates = platesFound,
         target = _G.TargetFrame ~= nil,
-        targetButtons = (_G.TargetFrame and #UnitAuraButtons(_G.TargetFrame, "TargetFrame")) or 0,
+        targetButtons = (_G.TargetFrame and TargetAuraCount(_G.TargetFrame)) or 0,
         playerBuffs = _G.BuffFrame ~= nil,
         playerDebuffs = _G.DebuffFrame ~= nil or playerHooked,
         hidden = #ns.GetHiddenFrameNames(),
@@ -369,19 +527,28 @@ function ns.GetAuraStatus()
 end
 
 local events = CreateFrame("Frame")
-for _, event in ipairs({ "NAME_PLATE_UNIT_ADDED", "UNIT_AURA", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
+for _, event in ipairs({ "NAME_PLATE_UNIT_ADDED", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
     "PLAYER_ENTERING_WORLD", "ADDON_LOADED" }) do
     pcall(events.RegisterEvent, events, event)
 end
-events:SetScript("OnEvent", function(_, event, unit)
+-- UNIT_AURA solo de las unidades que importan: las placas ya se rehacen con los enganches de Blizzard
+-- (RefreshList, Layout) y en combate sus UNIT_AURA llegan cientos de veces por segundo.
+-- Cada marco admite dos unidades: el jugador va en otro.
+local playerEvents = CreateFrame("Frame")
+local function RegisterUnitAura(frame, ...)
+    if not (frame.RegisterUnitEvent and pcall(frame.RegisterUnitEvent, frame, "UNIT_AURA", ...)) then
+        pcall(frame.RegisterEvent, frame, "UNIT_AURA")
+    end
+end
+RegisterUnitAura(events, "target", "focus")
+RegisterUnitAura(playerEvents, "player")
+local function OnEvent(_, event, unit)
     if not ns.db then return end
     if event == "NAME_PLATE_UNIT_ADDED" then
         pcall(StylePlateUnit, unit)
     elseif event == "UNIT_AURA" then
         if type(unit) ~= "string" or not Plain(unit) then return end
-        if unit:match("^nameplate") then
-            pcall(StylePlateUnit, unit)
-        elseif UNIT_FRAMES[unit] then
+        if UNIT_FRAMES[unit] then
             pcall(StyleUnitFrame, unit)
         elseif unit == "player" then
             pcall(StylePlayer)
@@ -394,4 +561,6 @@ events:SetScript("OnEvent", function(_, event, unit)
         -- Al entrar al mundo o al cargar otro addon pueden aparecer marcos nuevos
         ns.RefreshAuras()
     end
-end)
+end
+events:SetScript("OnEvent", OnEvent)
+playerEvents:SetScript("OnEvent", OnEvent)

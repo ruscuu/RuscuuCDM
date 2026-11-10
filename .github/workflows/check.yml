@@ -6,6 +6,8 @@ on:
     branches:
       - "**"
   pull_request:
+  # La usa también Release antes de publicar
+  workflow_call:
 
 jobs:
   check:

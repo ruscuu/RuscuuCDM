@@ -8,3 +8,4 @@ ignore:
   - README.md
   - tools
   - tests
+  - Media/logo.tga

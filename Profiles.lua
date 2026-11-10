@@ -29,9 +29,9 @@ end
 -- Lo que solo tiene sentido para una clase: hechizos elegidos, su orden, sus sonidos y sus excepciones
 local SPELL_KEYS = { "activeAdd", "activeRemove", "expireExclude" }
 
--- Copia de un perfil para otra clase: el aspecto se conserva, los hechizos que la clase no conoce no
-local function CopyForClass(source)
-    local copy = ns.CopyTable(source)
+-- Quita de un perfil (en su sitio) los hechizos que el personaje no conoce: los usan la copia para otra
+-- clase y la importación de un texto ajeno
+local function DropUnknownSpells(copy)
     local knows = ns.PlayerKnowsSpell or function() return nil end
     for _, key in ipairs(SPELL_KEYS) do
         if type(copy[key]) == "table" then
@@ -57,6 +57,11 @@ local function CopyForClass(source)
         copy.activeOrder = order
     end
     return copy
+end
+
+-- Copia de un perfil para otra clase: el aspecto se conserva, los hechizos que la clase no conoce no
+local function CopyForClass(source)
+    return DropUnknownSpells(ns.CopyTable(source))
 end
 
 -- Perfil propio de la clase del personaje (se crea la primera vez como copia de Default, sin hechizos ajenos).
@@ -175,6 +180,8 @@ function ns.RenameProfile(old, new)
         if char.noSpec == old then char.noSpec = new end
     end
     if ns.activeProfile == old then ns.activeProfile = new end
+    local undo = ns.global.importUndo
+    if type(undo) == "table" and undo.profile == old then undo.profile = new end
     if ns.RefreshOptions then ns.RefreshOptions() end
 end
 
@@ -184,8 +191,12 @@ function ns.DeleteProfile(name)
         return
     end
     ns.global.profiles[name] = nil
+    -- Deshacer una importación no debe rellenar otro perfil creado después con el mismo nombre
+    local undo = ns.global.importUndo
+    if type(undo) == "table" and undo.profile == name then ns.global.importUndo = nil end
     for class, profile in pairs(ns.global.classProfiles) do
-        if profile == name then ns.global.classProfiles[class] = nil end
+        -- Se apunta a Default (no se borra la entrada): sin ella ClassProfile volvería a crear el perfil borrado
+        if profile == name then ns.global.classProfiles[class] = "Default" end
     end
     -- Las especializaciones que usaban ese perfil vuelven a Default
     for _, char in pairs(ns.global.chars) do
@@ -195,7 +206,7 @@ function ns.DeleteProfile(name)
         if char.noSpec == name then char.noSpec = nil end
     end
     if ns.activeProfile == name then
-        ns.SetProfile("Default")
+        ns.SetProfile(ns.ProfileForSpec(ns.GetSpec()))
     elseif ns.RefreshOptions then
         ns.RefreshOptions()
     end
@@ -418,7 +429,11 @@ function ns.ExportProfile(name)
     local out = {}
     Flatten(ns.PROFILE_DEFAULTS, values, "", out)
     table.sort(out)
-    return PREFIX .. Encode(table.concat(out, ";"))
+    -- Cuántos valores lleva, para notar un texto cortado al copiarlo. Va el primero: un corte se lleva el
+    -- final, no la cuenta. Las versiones anteriores ignoran esta clave.
+    table.insert(out, 1, "n=" .. #out)
+    -- El ";" final marca que el último valor llegó entero (un corte a mitad de él no cambia la cuenta)
+    return PREFIX .. Encode(table.concat(out, ";") .. ";")
 end
 
 local function Clamp(n, low, high)
@@ -482,22 +497,31 @@ local function ImportValue(target, key, raw)
 end
 
 -- Lee un texto exportado sobre una copia de base; devuelve la copia y cuántos valores eran válidos
+-- (o nil, 0 y el motivo si el texto está cortado)
 local function ParseProfile(text, base)
     local payload = strtrim(text or ""):match("^" .. PREFIX:gsub("%p", "%%%0") .. "(.+)$")
     if not payload then return nil, 0 end
     local imported = ns.CopyTable(base)
-    local count = 0
-    for pair in Decode(payload):gmatch("[^;]+") do
+    local count, total, expected = 0, 0, nil
+    local decoded = Decode(payload)
+    for pair in decoded:gmatch("[^;]+") do
         local key, raw = pair:match("^([%w%.]+)=(.*)$")
-        if key and ImportValue(imported, key, raw) then count = count + 1 end
+        if key == "n" then
+            expected = tonumber(raw)
+        else
+            total = total + 1
+            if key and ImportValue(imported, key, raw) then count = count + 1 end
+        end
     end
+    -- Los textos de versiones anteriores no llevan la cuenta y se aceptan como antes
+    if expected and (expected ~= total or decoded:sub(-1) ~= ";") then return nil, 0, L["The text is incomplete: copy it again."] end
     return imported, count
 end
 
 -- Guarda un texto exportado como el perfil "name" (sustituye al que tenga ese nombre); devuelve el nombre
 function ns.ImportProfileAs(name, text)
-    local imported, count = ParseProfile(text, ns.PROFILE_DEFAULTS)
-    if not imported or count == 0 then return nil end
+    local imported, count, err = ParseProfile(text, ns.PROFILE_DEFAULTS)
+    if not imported or count == 0 then return nil, err end
     local profiles = ns.global.profiles
     if profiles[name] then
         -- Se rellena la misma tabla: si es el perfil activo, ns.db sigue apuntando a ella
@@ -509,13 +533,62 @@ function ns.ImportProfileAs(name, text)
     return name
 end
 
+-- Marcos que un texto importado nunca puede ocultar: sin ellos no se puede jugar ni deshacer el cambio
+local PROTECTED_FRAMES = {
+    UIParent = true, WorldFrame = true, SettingsPanel = true, GameMenuFrame = true, RuscuuCDMTextPopup = true,
+    InterfaceOptionsFrame = true, StaticPopup1 = true, StaticPopup2 = true, StaticPopup3 = true, StaticPopup4 = true,
+}
+
+local function ImportableHiddenFrame(name)
+    if type(name) ~= "string" or PROTECTED_FRAMES[name] then return false end
+    if name:match("^StaticPopup%d+$") or name:match("^ChatFrame%d+") then return false end
+    return true
+end
+
 function ns.ImportProfile(text)
     -- Se importa sobre una copia y solo se aplica si al menos un valor es válido
-    local imported, count = ParseProfile(text, ns.db)
-    if not imported or count == 0 then return false, L["Invalid import string."] end
+    local imported, count, err = ParseProfile(text, ns.db)
+    if not imported or count == 0 then return false, err or L["Invalid import string."] end
+    -- Un texto ajeno no trae hechizos de otra clase, ni marcos ocultos imprescindibles (el mundo, el menú,
+    -- el propio panel de opciones); los marcos nuevos que oculta se avisan en el chat
+    DropUnknownSpells(imported)
+    local hide, added = imported.aurasHideFrames, {}
+    if type(hide) == "table" then
+        local before = type(ns.db.aurasHideFrames) == "table" and ns.db.aurasHideFrames or {}
+        for name in pairs(hide) do
+            -- Lo que el jugador ya ocultaba él mismo se respeta; solo se filtra lo que trae el texto
+            if not before[name] and not ImportableHiddenFrame(name) then
+                hide[name] = nil
+            elseif not before[name] then
+                added[#added + 1] = name
+            end
+        end
+        table.sort(added)
+    end
 
+    -- Copia de lo anterior para poder deshacer la importación
+    ns.global.importUndo = { profile = ns.activeProfile, data = ns.CopyTable(ns.db) }
     wipe(ns.db)
     for k, v in pairs(imported) do ns.db[k] = v end
     ns.RefreshAll()
+    if #added > 0 then ns.Print(L["Hidden: %s"]:format(table.concat(added, ", ")), true) end
     return true, count
+end
+
+-- Deshace la última importación: el perfil vuelve a como estaba antes; devuelve su nombre
+function ns.UndoImport()
+    local undo = ns.global.importUndo
+    ns.global.importUndo = nil
+    if type(undo) ~= "table" or type(undo.data) ~= "table" then return nil end
+    local profile = ns.global.profiles[undo.profile]
+    if not profile then return nil end -- el perfil se borró después
+    -- Se rellena la misma tabla: si es el perfil activo, ns.db sigue apuntando a ella
+    wipe(profile)
+    for k, v in pairs(undo.data) do profile[k] = v end
+    if undo.profile == ns.activeProfile then
+        ns.SetProfile(undo.profile)
+    elseif ns.RefreshOptions then
+        ns.RefreshOptions()
+    end
+    return undo.profile
 end

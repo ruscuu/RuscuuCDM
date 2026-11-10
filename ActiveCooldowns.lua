@@ -272,9 +272,23 @@ local function RebuildPetSlots()
     end
 end
 
+-- El libro de hechizos en dos tablas: rango -> todos sus rangos, y nombre -> todos sus rangos.
+-- Leer el libro entero es caro: al rehacer la barra se lee una sola vez y se pasa a quien lo necesite.
+local function BookLookup()
+    local byID, byName = {}, {}
+    local ok, book = pcall(ns.GetSpellbookSpells)
+    for _, sp in ipairs(ok and type(book) == "table" and book or {}) do
+        local ranks = sp.ranks or { sp.spellID }
+        for _, id in ipairs(ranks) do byID[id] = ranks end
+        if sp.name ~= nil then byName[sp.name] = ranks end
+    end
+    return byID, byName
+end
+
 -- ¿Conoce el personaje este hechizo? true / false, o nil si el juego no deja saberlo.
 -- Los perfiles pueden compartirse entre personajes: así un hechizo de otra clase nunca sale en la barra.
-function ns.PlayerKnowsSpell(spellID)
+-- byID y byName (de BookLookup) son opcionales: sin ellos se lee el libro aquí (página de opciones).
+function ns.PlayerKnowsSpell(spellID, byID, byName)
     if petSlots[spellID] then return true end
     local checks = {
         IsPlayerSpell and function() return IsPlayerSpell(spellID) end,
@@ -294,15 +308,8 @@ function ns.PlayerKnowsSpell(spellID)
     end
     if not answered then return nil end
     -- Rangos y hechizos de menús desplegables: si está en el libro del personaje, lo conoce
-    local okBook, book = pcall(ns.GetSpellbookSpells)
-    local name = SpellName(spellID)
-    for _, sp in ipairs(okBook and book or {}) do
-        if sp.name == name then return true end
-        for _, id in ipairs(sp.ranks or {}) do
-            if id == spellID then return true end
-        end
-    end
-    return false
+    if not (byID and byName) then byID, byName = BookLookup() end
+    return byName[SpellName(spellID)] ~= nil or byID[spellID] ~= nil
 end
 
 -- Busca un hechizo por su número o por su nombre; devuelve su número o nil
@@ -331,11 +338,16 @@ function ns.ActiveItemIcon(itemID)
     if ok and not ns.IsSecret(icon) then return icon end
 end
 
+local requestedItems = {}   -- objetos ya pedidos al juego en esta sesión
 local function ItemName(itemID)
     local ok, name = pcall(ItemAPI("GetItemNameByID"), itemID)
     if ok and type(name) == "string" then return name end
-    -- Aún no está en la caché del juego: se pide, y GET_ITEM_INFO_RECEIVED avisa cuando llega
-    pcall(ItemAPI("RequestLoadItemDataByID"), itemID)
+    -- Aún no está en la caché del juego: se pide, y GET_ITEM_INFO_RECEIVED avisa cuando llega.
+    -- Una sola vez: uno que nunca carga (número erróneo) no debe pedirse en cada repaso de la barra
+    if not requestedItems[itemID] then
+        requestedItems[itemID] = true
+        pcall(ItemAPI("RequestLoadItemDataByID"), itemID)
+    end
     return "#" .. itemID
 end
 ns.ActiveItemName = ItemName
@@ -356,7 +368,7 @@ end
 
 -- Lo que muestra la barra: hechizos del Cooldown Manager, los añadidos (por nombre), los abalorios y los objetos,
 -- en el orden que eligió el jugador (lo que no tiene sitio en ese orden va al final)
-local function BuildEntries()
+local function BuildEntries(byID, byName)
     local db = ns.db
     local entries, seen = {}, {}
     local names = {}
@@ -374,7 +386,7 @@ local function BuildEntries()
     local extras = {}
     for id, on in pairs(db.activeAdd) do
         -- Un hechizo que este personaje no conoce (de otra clase que usa el mismo perfil) no sale
-        if on and type(id) == "number" and not seen[id] and ns.PlayerKnowsSpell(id) ~= false then extras[#extras + 1] = { id = id, name = SpellName(id) } end
+        if on and type(id) == "number" and not seen[id] and ns.PlayerKnowsSpell(id, byID, byName) ~= false then extras[#extras + 1] = { id = id, name = SpellName(id) } end
     end
     table.sort(extras, function(a, b)
         if a.name ~= b.name then return a.name < b.name end
@@ -549,8 +561,18 @@ local function NewIcon()
     f.border = ns.MakeBorder(f, f.icon)
     f.cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
     f.cd:SetAllPoints(f.icon)
-    -- El juego no avisa cuando termina un cooldown: el barrido sí, y se revisa al momento
-    f.cd:HookScript("OnCooldownDone", function() ns.RequestActiveUpdate() end)
+    -- El juego no avisa cuando termina un cooldown: el barrido sí, y se revisa al momento.
+    -- El barrido de un cooldown real no incluye el GCD: si acaba, el cooldown real acabó aunque un GCD
+    -- encadenado siga marcando el hechizo como activo, así que deja de contar como visto en cooldown real
+    -- (si no hubiera acabado, el siguiente SPELL_UPDATE_COOLDOWN lo vuelve a anotar)
+    f.cd:HookScript("OnCooldownDone", function()
+        if f.realSwipe and f.entry and f.entry.spell and f.style ~= "preview" then
+            f.realSwipe = nil
+            if f.spellID then latched[f.spellID] = nil end
+            for _, rank in ipairs(f.entry.ranks or {}) do latched[Resolve(rank)] = nil end
+        end
+        ns.RequestActiveUpdate()
+    end)
     -- Textos por encima del barrido y de los bordes
     f.texts = CreateFrame("Frame", nil, f)
     f.texts:SetAllPoints(f.icon)
@@ -660,16 +682,19 @@ local function ApplySpellCooldown(f, db, active, empty, recharging, isCharge)
         end
         duration = ok and d or nil
     end
+    local realCooldown = active and (empty or not isCharge)
+    -- Antes de tocar el barrido: si al cambiarlo el juego da por terminado el anterior, no es el fin del cooldown
+    f.realSwipe = nil
     if duration then
         f.cd:SetCooldownFromDurationObject(duration)
     else
         f.cd:Clear()
     end
+    f.realSwipe = (duration ~= nil and realCooldown) or nil
     f.durationKind = nil
     if duration and ns.ExpireAllowed(f.entry.spell) and db.expireOnCDM then
         f.durationKind = recharging and "charge" or "cooldown"
     end
-    local realCooldown = active and (empty or not isCharge)
     f.cd:SetDrawSwipe(db.showSwipe and realCooldown)
     if db.cooldownEdge == "blizzard" then
         f.cd:SetDrawEdge(isCharge and not empty)
@@ -705,7 +730,8 @@ local function ApplySlotCooldown(f, db, active, start, duration)
         f.durationKind = nil
     end
     f.cd:SetDrawSwipe(db.showSwipe)
-    if db.cooldownEdge ~= "blizzard" then f.cd:SetDrawEdge(db.cooldownEdge == "show") end
+    -- Siempre se fija: "blizzard" es sin borde en los objetos, y volver a esa opción debe quitarlo
+    f.cd:SetDrawEdge(db.cooldownEdge == "show")
     f.icon:SetDesaturated(active == true)
     -- Objetos: cuántos quedan en las bolsas (pociones, piedras de salud...)
     local count = f.entry and f.entry.item and ItemAPI("GetItemCount")
@@ -1002,19 +1028,19 @@ local function BuffActive(item, viewer)
         s.active = active
         return active
     end
+    -- Sin dato (nunca es secreto): un icono de reserva que Blizzard vació al devolverlo a su lista.
+    -- No vale lo que se guardó de su uso anterior, o dejaría un hueco en la línea
+    if active == nil then
+        s.active = nil
+        return false
+    end
     if viewer.hideWhenInactive == true then return Shown(item) end
     return s.active == true
 end
 
 -- Todos los rangos de cada hechizo elegido (en Forever cada rango es otro hechizo con el mismo nombre):
 -- el icono sale en cooldown se lance el rango que se lance
-local function AttachRanks(list)
-    local byID, byName = {}, {}
-    local ok, book = pcall(ns.GetSpellbookSpells)
-    for _, sp in ipairs(ok and book or {}) do
-        for _, id in ipairs(sp.ranks or { sp.spellID }) do byID[id] = sp.ranks end
-        byName[sp.name] = sp.ranks
-    end
+local function AttachRanks(list, byID, byName)
     for _, entry in ipairs(list) do
         if entry.spell then
             entry.ranks = byID[entry.spell] or byName[SpellName(entry.spell)] or { entry.spell }
@@ -1027,8 +1053,10 @@ local CaptureGCD -- más abajo: anota qué cooldowns son reales y cuáles solo e
 local function RebuildEntries()
     RebuildPetSlots()
     ReadCDMSpells()
-    entries = BuildEntries()
-    AttachRanks(entries)
+    -- El libro se lee una vez para todo el repaso (antes, una vez más por cada hechizo añadido desconocido)
+    local byID, byName = BookLookup()
+    entries = BuildEntries(byID, byName)
+    AttachRanks(entries, byID, byName)
     local used = {}
     for _, entry in ipairs(entries) do
         local f = GetIcon(entry)
@@ -1041,6 +1069,7 @@ local function RebuildEntries()
     for _, f in pairs(icons) do
         if not used[f] then
             f.entry, f.wasActive, f.lingerUntil, f.durationKind, f.style = nil, nil, nil, nil, nil
+            f.realSwipe = nil
             f.cd:Clear()
             f.flash:Hide()
             f:Hide()
@@ -1115,9 +1144,12 @@ local function Update()
             if textures then UpdateTexture(f) end
             if f.style ~= "preview" then
                 f.style = "preview"
+                f.realSwipe = nil
                 f.cd:SetCooldown(previewStart, PREVIEW_LENGTH) -- números propios, no del juego
                 f.durationKind = nil
                 f.cd:SetDrawSwipe(db.showSwipe)
+                -- Un icono que venía de cargas (con borde) no debe conservarlo en la vista previa
+                f.cd:SetDrawEdge(db.cooldownEdge == "show")
                 f.icon:SetDesaturated(false)
                 f.count:Hide()
             end
@@ -1280,10 +1312,14 @@ local COOLDOWN_EVENTS = { SPELL_UPDATE_COOLDOWN = true, SPELL_UPDATE_CHARGES = t
     ACTIONBAR_UPDATE_COOLDOWN = true, BAG_UPDATE_COOLDOWN = true, BAG_UPDATE_DELAYED = true,
     PLAYER_ENTERING_WORLD = true, PLAYER_REGEN_DISABLED = true, PLAYER_REGEN_ENABLED = true,
     PLAYER_MOUNT_DISPLAY_CHANGED = true, PLAYER_UPDATE_RESTING = true }
+-- Los que llegan en ráfaga con cada lanzamiento
+local BURST_EVENTS = { SPELL_UPDATE_COOLDOWN = true, SPELL_UPDATE_CHARGES = true, SPELL_UPDATE_ICON = true,
+    ACTIONBAR_UPDATE_COOLDOWN = true, BAG_UPDATE_COOLDOWN = true, BAG_UPDATE_DELAYED = true }
 local LIST_EVENTS = { SPELLS_CHANGED = true, PLAYER_EQUIPMENT_CHANGED = true, PLAYER_SPECIALIZATION_CHANGED = true,
-    PLAYER_TALENT_UPDATE = true, TRAIT_CONFIG_UPDATED = true, UNIT_PET = true, PET_BAR_UPDATE = true,
-    GET_ITEM_INFO_RECEIVED = true }
+    PLAYER_TALENT_UPDATE = true, TRAIT_CONFIG_UPDATED = true, UNIT_PET = true, PET_BAR_UPDATE = true }
 for event in pairs(COOLDOWN_EVENTS) do pcall(events.RegisterEvent, events, event) end
+-- Aparte: llega por cualquier objeto (subasta, vendedor, bolsas) y solo importa si es uno de la barra
+pcall(events.RegisterEvent, events, "GET_ITEM_INFO_RECEIVED")
 for event in pairs(LIST_EVENTS) do
     if event == "UNIT_PET" then
         pcall(events.RegisterUnitEvent, events, event, "player") -- solo la mascota del jugador
@@ -1291,7 +1327,15 @@ for event in pairs(LIST_EVENTS) do
         pcall(events.RegisterEvent, events, event)
     end
 end
-events:SetScript("OnEvent", function(_, event, itemID)
+events:SetScript("OnEvent", function(_, event, itemID, success)
+    if event == "GET_ITEM_INFO_RECEIVED" then
+        -- Objetos ajenos a la barra, o uno que no se pudo cargar: nada que rehacer
+        if not (ns.db and ns.db.activeItems[itemID]) or success == false then return end
+        entriesDirty = true
+        if ns.RefreshOptions then ns.RefreshOptions() end -- el nombre del objeto ya está
+        ns.RequestActiveUpdate()
+        return
+    end
     if LIST_EVENTS[event] then
         entriesDirty = true
     elseif event == "SPELL_UPDATE_ICON" then
@@ -1306,12 +1350,15 @@ events:SetScript("OnEvent", function(_, event, itemID)
         ns.SetActiveUnlocked(false)
         if ns.RefreshOptions then ns.RefreshOptions() end
     end
-    if event == "GET_ITEM_INFO_RECEIVED" then
-        if not (ns.db and ns.db.activeItems[itemID]) then return end
-        if ns.RefreshOptions then ns.RefreshOptions() end -- el nombre del objeto ya está
-    end
     if not (ns.db and ns.db.activeOnly) then return end
-    SafeUpdate()
+    -- Varios avisos de cooldown llegan juntos en cada lanzamiento: basta un repaso en el siguiente fotograma
+    -- (lo único que debe ser inmediato, anotar el GCD, ya se hizo arriba). Los demás (combate, montura...)
+    -- cambian si la barra se ve y se aplican al momento.
+    if BURST_EVENTS[event] then
+        ns.RequestActiveUpdate()
+    else
+        SafeUpdate()
+    end
 end)
 
 -- Cuando Blizzard vuelve a colocar sus iconos: se relee la lista de hechizos, se guardan las posiciones de
