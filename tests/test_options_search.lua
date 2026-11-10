@@ -1,7 +1,7 @@
 -- Buscador de la página "Cooldowns activos": no distingue mayúsculas ni acentos fuera del ASCII
 -- (string.lower no cambia "Л" ni "É", así que en ruRU no se encontraba nada escribiendo en minúsculas)
 package.path = "tests/?.lua;" .. package.path
-local M, ns, pages = require("addon_env")("ruRU")
+local M, _, pages = require("addon_env")("ruRU")
 
 -- Lo que hace el cliente: minúsculas y sin acentos, también en UTF-8
 local FOLD = { ["Л"] = "л", ["Е"] = "е", ["É"] = "e", ["é"] = "e" }

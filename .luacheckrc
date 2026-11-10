@@ -44,6 +44,7 @@ read_globals = {
     "ActionBarButtonEventsFrame", "ChatFontNormal", "ColorPickerFrame", "CooldownViewerSettings",
     "EditModeManagerFrame", "EventRegistry", "GameTooltip", "Minimap", "SettingsPanel", "Settings", "UIParent", "UISpecialFrames",
     "ACCEPT", "CANCEL", "NO", "YES", "RAID_CLASS_COLORS", "RANGE_INDICATOR", "SOUNDKIT", "STANDARD_TEXT_FONT",
+    "CooldownViewerConstants", "CaseAccentInsensitiveParse",
 }
 
 -- Pruebas: el simulador crea y sustituye globales del juego a propósito
