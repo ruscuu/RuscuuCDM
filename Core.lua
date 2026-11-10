@@ -536,6 +536,13 @@ end
 -- Eventos
 ------------------------------------------------------------------------
 
+-- Cada paso del inicio va protegido: un fallo (otro addon, un cambio de la API) no impide los demás
+local function Step(fn, ...)
+    if not fn then return end
+    local ok, err = pcall(fn, ...)
+    if not ok then ns.ReportError(err) end
+end
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")
@@ -561,14 +568,14 @@ events:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "PLAYER_LOGIN" then
         -- Primero el perfil de la especialización, para no aplicar nunca el de Default por error
         local ok, name = pcall(ns.ProfileForSpec, ns.GetSpec())
-        ns.UseProfile(ok and name or "Default")
-        ns.EnableCooldownManager()
-        ns.ApplyActionBarNumbersMode()
-        ns.HookActionBars()
-        ns.HookViewers()
-        ns.RefreshAll()
+        Step(ns.UseProfile, ok and name or "Default")
+        Step(ns.EnableCooldownManager)
+        Step(ns.ApplyActionBarNumbersMode)
+        Step(ns.HookActionBars)
+        Step(ns.HookViewers)
+        Step(ns.RefreshAll)
         -- Para entonces los addons de minimapa ya decidieron su forma (cuadrada, redonda...)
-        ns.UpdateMinimapPosition()
+        Step(ns.UpdateMinimapPosition)
     elseif event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED"
         or (event == "PLAYER_SPECIALIZATION_CHANGED" and arg1 == "player") then
         ns.SelectProfileForSpec()
@@ -576,8 +583,8 @@ events:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "PLAYER_ENTERING_WORLD" then
         -- Al cambiar de zona Blizzard rehace los iconos; los addons de barras pueden crear botones tarde
         C_Timer.After(1, function()
-            ns.SkinAll()
-            ns.HookActionBars()
+            Step(ns.SkinAll)
+            Step(ns.HookActionBars)
         end)
     end
 end)
@@ -645,14 +652,15 @@ function ns.ShowPopup(which, textArg1, textArg2, data)
 end
 
 -- Borrar toda la configuración pide confirmación; se conserva que el Cooldown Manager ya se activó
+-- y las instantáneas de la interfaz (son copias de seguridad del jugador, no ajustes de estilo)
 StaticPopupDialogs["RUSCUUCDM_RESET_ALL"] = {
-    textKey = "Reset ALL Ruscuu CDM settings and profiles? The interface will reload.",
+    textKey = "Reset ALL Ruscuu CDM settings and profiles? Your saved interface snapshots are kept. The interface will reload.",
     text = "",
     button1 = YES,
     button2 = NO,
     OnAccept = function()
-        local keep = RuscuuCDMDB and RuscuuCDMDB.cdmAutoDone
-        RuscuuCDMDB = { cdmAutoDone = keep }
+        local old = RuscuuCDMDB or {}
+        RuscuuCDMDB = { cdmAutoDone = old.cdmAutoDone, snapshots = old.snapshots, snapshotRestore = old.snapshotRestore }
         ReloadUI()
     end,
     timeout = 0,
@@ -676,6 +684,7 @@ function ns.GetStatus()
         expireReads = ns.CountExpireReads(),
         expireBroken = ns.IsExpireBroken(),
         auraAPI = ns.HasAuraDurationAPI(),
+        hiddenBuffReads = ns.CountHiddenBuffReads and ns.CountHiddenBuffReads() or 0,
         activeAPI = ns.ActiveCooldownAPI(),
         activeEntries = ns.CountActiveEntries(),
     }
@@ -695,6 +704,10 @@ function ns.Debug()
         s.curveAPI and yes or no, s.expireTracked, s.expireReads)
         .. (s.expireBroken and " |cffff5555(" .. L["disabled"] .. ")|r" or ""), true)
     ns.Print(L["Buffs about to end: aura API %s"]:format(s.auraAPI and yes or no), true)
+    -- En combate el juego puede ocultar el aura a los addons: ahí el aviso no puede aparecer
+    if s.hiddenBuffReads > 0 then
+        ns.Print(L["Buffs about to end: hidden by the game %d times"]:format(s.hiddenBuffReads), true)
+    end
     ns.Print(L["Active cooldowns: cooldown state %s"]:format(s.activeAPI == nil and "?" or (s.activeAPI and yes or no))
         .. " · " .. L["%d in the bar"]:format(s.activeEntries), true)
     local ref = ns.GetLockReference and ns.GetLockReference()

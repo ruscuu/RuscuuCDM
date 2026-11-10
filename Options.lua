@@ -36,6 +36,47 @@ local function Apply()
     SafeCall(ApplyStyle)
 end
 
+-- Texto para buscar sin distinguir mayúsculas ni acentos. string.lower solo cambia letras ASCII, así que
+-- "ледяная" no encontraba "Ледяная стрела" ni "éclair" a "Éclair": se usa la función del cliente si existe
+local function Fold(text)
+    if type(text) ~= "string" then return "" end
+    if CaseAccentInsensitiveParse then
+        local ok, folded = pcall(CaseAccentInsensitiveParse, text)
+        if ok and type(folded) == "string" then return folded end
+    end
+    return text:lower()
+end
+
+-- Al elegir "Dejar el ajuste del juego" se devuelve el valor que tenía antes de que el addon lo cambiara.
+-- Se envuelve aquí la función de Core.lua: se guarda el valor original antes de la primera escritura.
+local COUNTDOWN_CVAR = "countdownForCooldowns"
+local applyNumbersMode = ns.ApplyActionBarNumbersMode
+function ns.ApplyActionBarNumbersMode(...)
+    local mode = ns.global and ns.global.actionBarNumbersMode
+    if (mode == "on" or mode == "off") and ns.global.countdownCVarOriginal == nil and C_CVar then
+        local ok, value = pcall(C_CVar.GetCVar, COUNTDOWN_CVAR)
+        if ok and type(value) == "string" then ns.global.countdownCVarOriginal = value end
+    end
+    return applyNumbersMode(...)
+end
+
+local function RestoreCountdownCVar()
+    local original = ns.global and ns.global.countdownCVarOriginal
+    if original == nil then return end
+    ns.global.countdownCVarOriginal = nil
+    SetCVar(COUNTDOWN_CVAR, original)
+end
+
+-- "Borrar todo" también devuelve el ajuste del juego (la ventana está en Core.lua; se envuelve su OnAccept)
+local resetAll = StaticPopupDialogs and StaticPopupDialogs["RUSCUUCDM_RESET_ALL"]
+if resetAll and resetAll.OnAccept then
+    local accept = resetAll.OnAccept
+    resetAll.OnAccept = function(...)
+        pcall(RestoreCountdownCVar)
+        return accept(...)
+    end
+end
+
 local function PlayClick(on)
     if SOUNDKIT then
         PlaySound(on and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF)
@@ -374,6 +415,8 @@ function Layout:Color(col, label, key, onChange, tip)
     end
     local function apply(r, g, bl, a)
         local c = ns.db[key]
+        -- El selector llama a swatchFunc y a opacityFunc en cada movimiento: sin cambios no se reaplica todo
+        if c[1] == r and c[2] == g and c[3] == bl and (c[4] or 1) == a then return end
         c[1], c[2], c[3], c[4] = r, g, bl, a
         refresh()
         SafeCall(onChange or ApplyStyle)
@@ -662,7 +705,7 @@ local function BuildGeneral(ui)
     }, "\n"))
     ui:Next(hc + 4)
     ui:Button(1, L["Reset everything"], 200, function() ns.ShowPopup("RUSCUUCDM_RESET_ALL") end,
-        L["Deletes all profiles and settings of the addon and reloads the interface."])
+        L["Deletes all profiles and settings of the addon and reloads the interface. Your interface snapshots are kept."])
     ui:Next(30)
 end
 
@@ -792,6 +835,7 @@ local function BuildActionBars(ui)
         function(value)
             ns.global.actionBarNumbersMode = value
             ns.ApplyActionBarNumbersMode()
+            if value == "blizzard" then RestoreCountdownCVar() end
         end,
         L["Controls the game's own \"Show numbers for cooldowns\" setting (shared by all profiles)."])
     ui:Next(56)
@@ -1221,9 +1265,9 @@ local function BuildActive(ui, panel)
         table.sort(added.spells, byName)
         table.sort(items.spells, byName)
 
-        local needle = strtrim(filter):lower()
+        local needle = Fold(strtrim(filter))
         local function matches(sp)
-            return needle == "" or sp.name:lower():find(needle, 1, true) ~= nil or tostring(sp.spellID) == needle
+            return needle == "" or Fold(sp.name):find(needle, 1, true) ~= nil or tostring(sp.spellID) == strtrim(filter)
         end
 
         local y, rowCount, headerCount = listTop, 0, 0
@@ -1657,6 +1701,15 @@ local function BuildProfiles(ui)
     ui:Next(h4)
     ui:Button(1, L["Export"], 160, ShowExport)
     ui:Button(1, L["Import"], 160, ShowImport, nil, 170)
+    ui:Next(32)
+    ui:Button(1, L["Undo import"], 160, function()
+        local name = ns.UndoImport()
+        if name then
+            ns.Print(L["Import undone: %s"]:format(name), true)
+        else
+            ns.Print(L["Nothing to undo."], true)
+        end
+    end, L["Restores the profile as it was before the last import."])
     ui:Next(32)
 end
 

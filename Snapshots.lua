@@ -11,6 +11,7 @@ local MAX_ACCOUNT_MACROS = 120       -- las macros con un índice mayor son del 
 local MAX_LAYOUTS = 5                -- diseños del Modo Edición por tipo (cuenta / personaje)
 local LAYOUT_NAME_MAX = 32
 local RANDOM_FAVORITE_MOUNT = 268435455
+local CLASS_BAR_FIRST, CLASS_BAR_LAST = 73, 120   -- barras que cambia la clase (formas de druida, sigilo...)
 
 -- Tipos de acción que se saben volver a colocar; el resto se guarda pero se informa como no restaurable
 local ACTION_TYPES = {
@@ -112,6 +113,47 @@ end
 -- Teclas
 ------------------------------------------------------------------------
 
+-- Teclas que se revisan una a una: GetBinding solo lista los comandos de Bindings.xml, así que
+-- las teclas puestas a botones de addons (CLICK), hechizos, macros u objetos no salen en esa lista
+local SCAN_MODIFIERS = { "", "ALT-", "CTRL-", "SHIFT-", "ALT-CTRL-", "ALT-SHIFT-", "CTRL-SHIFT-", "ALT-CTRL-SHIFT-" }
+local SCAN_KEYS = {
+    "SPACE", "TAB", "ENTER", "BACKSPACE", "UP", "DOWN", "LEFT", "RIGHT", "HOME", "END", "PAGEUP", "PAGEDOWN",
+    "INSERT", "DELETE", "MOUSEWHEELUP", "MOUSEWHEELDOWN", "`", "-", "=", "[", "]", "\\", ";", "'", ",", ".", "/",
+    "NUMPADDIVIDE", "NUMPADMULTIPLY", "NUMPADMINUS", "NUMPADPLUS", "NUMPADDECIMAL", "NUMPADENTER",
+}
+for c = ("A"):byte(), ("Z"):byte() do SCAN_KEYS[#SCAN_KEYS + 1] = string.char(c) end
+for i = 0, 9 do
+    SCAN_KEYS[#SCAN_KEYS + 1] = tostring(i)
+    SCAN_KEYS[#SCAN_KEYS + 1] = "NUMPAD" .. i
+end
+for i = 1, 12 do SCAN_KEYS[#SCAN_KEYS + 1] = "F" .. i end
+for i = 1, 31 do SCAN_KEYS[#SCAN_KEYS + 1] = "BUTTON" .. i end
+
+local DIRECT_ACTIONS = { "^CLICK ", "^SPELL ", "^MACRO ", "^ITEM " }
+
+-- Añade a la lista las teclas puestas directamente a botones, hechizos, macros u objetos
+local function AddDirectBindings(list)
+    local getAction = _G.GetBindingAction   -- por _G: no está en la lista de luacheck
+    if type(getAction) ~= "function" then return end
+    local listed = {}
+    for _, pair in ipairs(list) do listed[pair[2]] = true end
+    for _, modifier in ipairs(SCAN_MODIFIERS) do
+        for _, base in ipairs(SCAN_KEYS) do
+            local key = modifier .. base
+            local action = not listed[key] and Call(getAction, key)
+            if type(action) == "string" then
+                for _, pattern in ipairs(DIRECT_ACTIONS) do
+                    if action:match(pattern) then
+                        list[#list + 1] = { action, key }
+                        listed[key] = true
+                        break
+                    end
+                end
+            end
+        end
+    end
+end
+
 -- Lista de { comando, tecla } con todas las teclas asignadas a las acciones del juego y de los addons
 local function CurrentBindings()
     local list = {}
@@ -127,6 +169,7 @@ local function CurrentBindings()
             end
         end
     end
+    AddDirectBindings(list)
     return list
 end
 
@@ -163,11 +206,24 @@ local function SameAction(a, b)
     return a.t == b.t and a.id == b.id
 end
 
+-- Icono guardado en la macro: con el signo de interrogación GetMacroInfo da el del hechizo que muestra,
+-- y si se guardara ese, la macro restaurada dejaría de cambiar de icono
+local function StoredMacroIcon(index)
+    local macroAPI = _G.C_Macro   -- por _G: no está en la lista de luacheck
+    if macroAPI and macroAPI.GetSelectedMacroIcon then
+        local icon = Call(macroAPI.GetSelectedMacroIcon, index)
+        if icon then return icon end
+    end
+    local _, icon = GetMacroInfo(index)
+    return icon
+end
+
 local function CaptureMacro(name, macros)
     if macros[name] or not GetMacroInfo then return end
     local _, icon, body = GetMacroInfo(name)
     if type(body) ~= "string" then return end
     local index = GetMacroIndexByName and GetMacroIndexByName(name) or 0
+    if index > 0 then icon = StoredMacroIcon(index) end
     macros[name] = { icon = icon, body = body, perChar = index > MAX_ACCOUNT_MACROS }
 end
 
@@ -176,9 +232,9 @@ local function CaptureAllMacros(macros)
     if not (GetNumMacros and GetMacroInfo) then return end
     local numAccount, numChar = GetNumMacros()
     local function add(index, perChar)
-        local name, icon, body = GetMacroInfo(index)
+        local name, _, body = GetMacroInfo(index)
         if type(name) == "string" and name ~= "" and type(body) == "string" and not macros[name] then
-            macros[name] = { icon = icon, body = body, perChar = perChar }
+            macros[name] = { icon = StoredMacroIcon(index), body = body, perChar = perChar }
         end
     end
     for i = 1, numAccount or 0 do add(i, false) end
@@ -194,9 +250,14 @@ local function RestoreMacros(macros, report)
         local m = macros[name]
         local index = GetMacroIndexByName and GetMacroIndexByName(name) or 0
         if index > 0 then
-            local _, icon, body = GetMacroInfo(index)
-            if (body ~= m.body or icon ~= m.icon) and EditMacro then
-                if Call(EditMacro, index, name, m.icon or icon, m.body) then report.macrosUpdated = report.macrosUpdated + 1 end
+            local icon = StoredMacroIcon(index)
+            local _, shown, body = GetMacroInfo(index)
+            -- Las instantáneas antiguas guardaban el icono mostrado: si coincide con él, se deja el guardado
+            -- (si no, una macro con "?" se editaría y quedaría fija con el icono del hechizo)
+            local wantIcon = m.icon
+            if wantIcon == nil or wantIcon == shown then wantIcon = icon end
+            if (body ~= m.body or icon ~= wantIcon) and EditMacro then
+                if Call(EditMacro, index, name, wantIcon, m.body) then report.macrosUpdated = report.macrosUpdated + 1 end
             end
         elseif CreateMacro then
             if (Call(CreateMacro, name, m.icon or "INV_MISC_QUESTIONMARK", m.body, m.perChar) or 0) > 0 then
@@ -287,11 +348,15 @@ function ns.DescribeAction(action)
     return name or (kind .. " " .. tostring(id))
 end
 
-local function RestoreActions(saved, macros, report)
+-- sameClass = false: la instantánea es de otra clase y sus barras de clase no se tocan
+-- (si no, un guerrero dejaría vacías las barras de forma felina, de oso... de un druida)
+local function RestoreActions(saved, macros, report, sameClass)
     ClearCursor()
     for slot = 1, MAX_ACTION_SLOT do
         local want = saved[slot]
-        if not SameAction(ReadAction(slot), want) then
+        if not sameClass and slot >= CLASS_BAR_FIRST and slot <= CLASS_BAR_LAST then
+            if not SameAction(ReadAction(slot), want) then report.classBarsSkipped = true end
+        elseif not SameAction(ReadAction(slot), want) then
             if HasAction(slot) then
                 PickupAction(slot)
                 ClearCursor()
@@ -383,8 +448,14 @@ function ns.RestoreSnapshot(name, parts)
         report.macrosDone = true
     end
     if parts.actions and snap.actions then
-        RestoreActions(snap.actions, snap.macros or {}, report)
+        local _, class = UnitClass("player")
+        local sameClass = snap.class == nil or snap.class == class
+        RestoreActions(snap.actions, snap.macros or {}, report, sameClass)
         report.actionsDone = true
+        -- El informe lo escribe Options.lua; este aviso se da aquí para que salga siempre que pase
+        if report.classBarsSkipped then
+            ns.Print(L["This snapshot is from another class: its class bars (forms, stealth) were left untouched."], true)
+        end
     end
     if parts.layout and snap.layout then
         local ok, result = RestoreLayout(snap.layout, name)
@@ -396,6 +467,8 @@ end
 ------------------------------------------------------------------------
 -- Exportar / importar: "!RUSCUUUI:1!" + base64 de líneas separadas por tabuladores.
 -- La importación nunca ejecuta código: solo acepta líneas conocidas con valores del tipo esperado.
+-- Formato 2: la primera línea es "V\t2" y la última "Z\t<número de líneas anteriores>", para rechazar
+-- un texto cortado. El prefijo sigue siendo :1! porque las versiones anteriores ignoran esas líneas.
 ------------------------------------------------------------------------
 
 local PREFIX = "!RUSCUUUI:1!"
@@ -411,7 +484,8 @@ end
 function ns.ExportSnapshot(name)
     local snap = ns.GetSnapshot(name)
     if not snap then return nil end
-    local lines = { "N\t" .. Escape(name) }
+    local lines = { "V\t2", "N\t" .. Escape(name) }
+    if snap.class then lines[#lines + 1] = "C\t" .. Escape(snap.class) end
     if snap.layout then lines[#lines + 1] = "E\t" .. Escape(snap.layout) end
     for _, pair in ipairs(snap.bindings or {}) do
         lines[#lines + 1] = "B\t" .. Escape(pair[1]) .. "\t" .. Escape(pair[2])
@@ -427,6 +501,7 @@ function ns.ExportSnapshot(name)
         local m = snap.macros[macroName]
         lines[#lines + 1] = ("M\t%s\t%s\t%d\t%s"):format(Escape(macroName), Escape(m.icon or ""), m.perChar and 1 or 0, Escape(m.body))
     end
+    lines[#lines + 1] = "Z\t" .. #lines
     return PREFIX .. ns.Base64Encode(table.concat(lines, "\n"))
 end
 
@@ -434,19 +509,36 @@ local function ValidText(text, maxLength)
     return type(text) == "string" and text ~= "" and #text <= maxLength
 end
 
+-- Los nombres se miden en letras, como el cuadro donde se escriben (una letra rusa ocupa 2 bytes)
+local function ValidName(text)
+    local utf8Length = _G.strlenutf8   -- por _G: no está en la lista de luacheck
+    return ValidText(text, 240) and (type(utf8Length) ~= "function" or utf8Length(text) <= 60)
+end
+
 -- Lee el texto exportado; devuelve el nombre propuesto y la instantánea, o nil y el motivo
 function ns.ParseSnapshot(text)
     local payload = strtrim(text or ""):match("^" .. PREFIX:gsub("%p", "%%%0") .. "(.+)$")
     if not payload then return nil, L["Invalid import string."] end
+    -- Un base64 completo tiene un múltiplo de 4 caracteres: si no, el texto se cortó
+    local clean = payload:gsub("%s", "")
+    if #clean % 4 ~= 0 then return nil, L["Invalid import string."] end
     local snap = { bindings = {}, actions = {}, macros = {} }
-    local name, valid = nil, 0
+    local name, valid, version, complete, lineCount = nil, 0, 1, false, 0
     for line in ns.Base64Decode(payload):gmatch("[^\n]+") do
         local fields = {}
         for field in (line .. "\t"):gmatch("([^\t]*)\t") do fields[#fields + 1] = Unescape(field) end
         local kind = fields[1]
-        if kind == "N" and ValidText(fields[2], 60) then
+        if kind == "V" and lineCount == 0 then
+            version = tonumber(fields[2]) or version
+        elseif kind == "Z" then
+            complete = tonumber(fields[2]) == lineCount
+        elseif kind == "N" and ValidName(fields[2]) then
             name = fields[2]
-        elseif kind == "E" and ValidText(fields[2], 50000) and fields[2]:match("^[%w%+/=]+$") then
+        elseif kind == "C" and ValidText(fields[2], 32) and fields[2]:match("^%u+$") then
+            snap.class = fields[2]
+        elseif kind == "E" and ValidText(fields[2], 50000) and fields[2]:match("^[%w%+/=]+$")
+            and (not (C_EditMode and C_EditMode.ConvertStringToLayoutInfo)
+                or type(Call(C_EditMode.ConvertStringToLayoutInfo, fields[2])) == "table") then
             snap.layout = fields[2]
             valid = valid + 1
         elseif kind == "B" and ValidText(fields[2], 200) and ValidText(fields[3], 64) then
@@ -465,17 +557,21 @@ function ns.ParseSnapshot(text)
             local icon = tonumber(fields[3]) or (fields[3] ~= "" and fields[3]) or nil
             snap.macros[fields[2]] = { icon = icon, body = fields[5], perChar = fields[4] == "1" }
         end
+        lineCount = lineCount + 1
     end
+    -- Formato 2: si falta la última línea o no cuadra el número de líneas, el texto está cortado
+    if version >= 2 and not complete then return nil, L["Invalid import string."] end
     if valid == 0 then return nil, L["Invalid import string."] end
-    return name or L["Imported"], snap
+    -- El tercer valor dice si el texto traía nombre (sin nombre nunca sustituye a otra instantánea)
+    return name or L["Imported"], snap, name ~= nil
 end
 
 -- Importa como una instantánea nueva (si el nombre ya existe se le añade un número, salvo con replace)
 function ns.ImportSnapshot(text, replace)
-    local name, snap = ns.ParseSnapshot(text)
+    local name, snap, named = ns.ParseSnapshot(text)
     if not name then return false, snap end
     local base, n = name, 2
-    while ns.global.snapshots[name] and not replace do
+    while ns.global.snapshots[name] and not (replace and named) do
         name = ("%s (%d)"):format(base, n)
         n = n + 1
     end
@@ -512,7 +608,7 @@ function ns.ImportAll(text)
         local kind, a, b = line:match("^(%u)\t([^\t]*)\t?([^\t]*)$")
         if kind == "S" and ns.ImportSnapshot(a, true) then
             snapshots = snapshots + 1
-        elseif kind == "P" and ValidText(Unescape(a), 60) and ns.ImportProfileAs(Unescape(a), b) then
+        elseif kind == "P" and ValidName(Unescape(a)) and ns.ImportProfileAs(Unescape(a), b) then
             profiles = profiles + 1
         end
     end

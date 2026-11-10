@@ -214,24 +214,55 @@ local function UnskinIcon(item, d)
     if d.border then d.border:Hide() end
 end
 
-local function SkinCooldown(item, d, db)
+-- ¿Muestra Blizzard la cuenta atrás en este visor? (opción "Mostrar temporizador" del Modo Edición)
+local function BlizzTimerShown(viewer)
+    return not (viewer and viewer.timerShown == false)
+end
+
+-- ¿Eligió Blizzard el color amarillo de "aura activa" para el barrido? Ese se respeta
+local function AuraSwipe(item)
+    local color = item.cooldownSwipeColor
+    local aura = CooldownViewerConstants and CooldownViewerConstants.ITEM_AURA_COLOR
+    if color == nil or aura == nil or ns.IsSecret(color) then return false end
+    return color == aura
+end
+
+-- Barrido y borde del addon. Blizzard vuelve a poner los suyos en cada actualización del cooldown
+-- (cada GCD, cada cambio de aura), así que esto se repite justo después, desde SetCooldown.
+-- Solo usa valores del addon, nunca los del juego (pueden ser secretos).
+local function ApplySwipe(item, db)
+    local cd = item.Cooldown
+    if not db.showSwipe then cd:SetDrawSwipe(false) end
+    if not AuraSwipe(item) then
+        local c = db.swipeColor
+        cd:SetSwipeColor(c[1], c[2], c[3], c[4] or 1)
+    end
+    -- En modo "blizzard" el borde lo decide el juego en cada cooldown (las cargas lo usan, el resto no)
+    if db.cooldownEdge ~= "blizzard" then cd:SetDrawEdge(db.cooldownEdge == "show") end
+end
+
+local function ReapplySwipe(item)
+    local d = decor[item]
+    if not (d and d.skinned and ns.db and item.Cooldown) then return end
+    ApplySwipe(item, ns.db)
+end
+
+local function SkinCooldown(item, d, db, viewer)
     local cd = item.Cooldown
     if not cd then return end
-    if d.origEdge == nil then d.origEdge = SafeGet(cd, "GetDrawEdge") end
     if d.origBling == nil then d.origBling = SafeGet(cd, "GetDrawBling") end
+    if not d.swipeHooked and cd.SetCooldown then
+        d.swipeHooked = true
+        hooksecurefunc(cd, "SetCooldown", function() ReapplySwipe(item) end)
+    end
 
     local c = db.swipeColor
-    cd:SetDrawSwipe(db.showSwipe)
     cd:SetSwipeTexture(db.squareIcons and WHITE or BLIZZ_SWIPE, c[1], c[2], c[3], c[4] or 1)
-    cd:SetSwipeColor(c[1], c[2], c[3], c[4] or 1)
+    -- Si el addon lo ocultó antes y ahora se vuelve a pedir, se muestra (los buffs no lo reponen solos)
+    if db.showSwipe and d.swipeHidden then cd:SetDrawSwipe(true) end
+    d.swipeHidden = not db.showSwipe
+    ApplySwipe(item, db)
 
-    if db.cooldownEdge == "show" then
-        cd:SetDrawEdge(true)
-    elseif db.cooldownEdge == "hide" then
-        cd:SetDrawEdge(false)
-    elseif d.origEdge ~= nil then
-        cd:SetDrawEdge(d.origEdge)
-    end
     if db.cooldownBling == "show" then
         cd:SetDrawBling(true)
     elseif db.cooldownBling == "hide" then
@@ -240,21 +271,24 @@ local function SkinCooldown(item, d, db)
         cd:SetDrawBling(d.origBling)
     end
 
-    -- El juego calcula y dibuja los números; el addon solo decide si se muestran y con qué fuente
-    cd:SetHideCountdownNumbers(not db.showNumbers)
+    -- El juego calcula y dibuja los números; el addon solo decide si se muestran y con qué fuente.
+    -- Si el Modo Edición oculta el temporizador de este visor, el addon no lo vuelve a mostrar.
+    cd:SetHideCountdownNumbers(not (db.showNumbers and BlizzTimerShown(viewer)))
+    -- Se guarda el texto original antes de cambiar su fuente, para poder restaurar la de Blizzard
+    local fs = cd:GetCountdownFontString()
+    if fs and fs.SetFont then SaveText(fs) end
     cd:SetCountdownFont(ns.CDM_FONT_NAME)
-    ns.StyleText(cd:GetCountdownFontString(), db.fontSize, db.numberOutline, db.numberColor)
+    ns.StyleText(fs, db.fontSize, db.numberOutline, db.numberColor)
 end
 
-local function UnskinCooldown(item, d)
+local function UnskinCooldown(item, d, viewer)
     local cd = item.Cooldown
     if not cd then return end
     cd:SetDrawSwipe(true)
     cd:SetSwipeTexture(BLIZZ_SWIPE, 0, 0, 0, 0.7)
     cd:SetSwipeColor(0, 0, 0, 0.7)
-    if d.origEdge ~= nil then cd:SetDrawEdge(d.origEdge) end
     if d.origBling ~= nil then cd:SetDrawBling(d.origBling) end
-    cd:SetHideCountdownNumbers(false)
+    cd:SetHideCountdownNumbers(not BlizzTimerShown(viewer))
     cd:SetCountdownFont(item.cooldownFont or BLIZZ_COUNTDOWN_FONT)
     ns.RestoreText(cd:GetCountdownFontString())
 end
@@ -297,7 +331,7 @@ local function UnskinBar(item, d)
     ns.RestoreText(bar.Duration)
 end
 
-local function SkinItem(item, db)
+local function SkinItem(item, db, viewer)
     local d = decor[item]
     if not d then
         d = {}
@@ -305,19 +339,19 @@ local function SkinItem(item, db)
     end
     d.skinned = true
     SkinIcon(item, d, db)
-    SkinCooldown(item, d, db)
+    SkinCooldown(item, d, db, viewer)
     for _, fs in ipairs(CountTexts(item)) do
         ns.StyleText(fs, db.countSize, db.countOutline, db.countUseColor and db.countColor or nil)
     end
     SkinBar(item, d, db)
 end
 
-local function UnskinItem(item)
+local function UnskinItem(item, viewer)
     local d = decor[item]
     if not d or not d.skinned then return end
     d.skinned = false
     UnskinIcon(item, d)
-    UnskinCooldown(item, d)
+    UnskinCooldown(item, d, viewer)
     for _, fs in ipairs(CountTexts(item)) do ns.RestoreText(fs) end
     UnskinBar(item, d)
 end
@@ -385,8 +419,13 @@ local buffCurve          -- buffs a punto de terminar
 local tracked = {}        -- owner -> { tex, getDuration, kind, border, inner, edges, glow, errors }
 local trackedCount = 0
 local reads = 0
+local secretAuraReads = 0 -- veces que el juego ocultó el aura de un buff (ahí el aviso no puede salir)
 local testUntil = 0
 local testing = false
+local lastPulse = nil     -- último pulso aplicado (nil = aplicarlo de nuevo a todos)
+local idle = false        -- sin ningún aviso activo: bordes ya ocultos, nada que hacer cada fotograma
+-- Bordes de frames que dejaron de seguirse: se reutilizan si vuelven (el juego nunca libera frames)
+local expireCache = setmetatable({}, { __mode = "k" })
 
 -- Transparente con 0 s (habilidad lista o sin buff), del color elegido hasta N s, transparente a partir de ahí
 local function BuildCurve(c, s)
@@ -562,10 +601,13 @@ end
 function ns.TrackExpire(owner, tex, getDuration, kind, isOnGCD)
     local entry = tracked[owner]
     if not entry then
-        entry = { errors = 0 }
+        entry = expireCache[owner] or { errors = 0 }
+        expireCache[owner] = nil
+        entry.errors, entry.disabled = 0, nil
         tracked[owner] = entry
         trackedCount = trackedCount + 1
     end
+    lastPulse = nil -- el borde nuevo recibe el pulso actual
     entry.tex, entry.getDuration, entry.kind, entry.isOnGCD = tex, getDuration, kind, isOnGCD
     entry.gcd = CheckGCD(entry)
     LayoutExpire(entry, owner)
@@ -587,6 +629,7 @@ function ns.UntrackExpire(owner)
     local entry = tracked[owner]
     if not entry then return end
     if entry.border then entry.border:Hide() end
+    expireCache[owner] = entry
     tracked[owner] = nil
     trackedCount = trackedCount - 1
 end
@@ -663,6 +706,15 @@ driver:SetScript("OnUpdate", function(_, elapsed)
             HideAllExpire()
             sinceEval = 1
         end
+        -- Sin ningún aviso activo no hay nada que evaluar: se ocultan los bordes una vez y se espera
+        if not ((db.expireGlow and expireCurve) or (db.buffEndGlow and buffCurve)) then
+            if not idle then
+                idle = true
+                HideAllExpire()
+            end
+            return
+        end
+        idle = false
         sinceEval = sinceEval + elapsed
         if sinceEval >= 0.1 then
             sinceEval = 0
@@ -682,9 +734,16 @@ driver:SetScript("OnUpdate", function(_, elapsed)
         end
     end
 
-    local pulse = PulseAlpha(now, db)
-    for _, entry in pairs(tracked) do
-        if entry.border:IsShown() then entry.inner:SetAlpha(pulse) end
+    -- El pulso solo se aplica cuando cambia de forma visible (a todos, así un borde que aparece ya lo tiene)
+    if db.expirePulse ~= "none" then
+        local pulse = PulseAlpha(now, db)
+        if math.abs(pulse - (lastPulse or -1)) > 0.02 then
+            lastPulse = pulse
+            for _, entry in pairs(tracked) do entry.inner:SetAlpha(pulse) end
+        end
+    elseif lastPulse ~= 1 then
+        lastPulse = 1
+        for _, entry in pairs(tracked) do entry.inner:SetAlpha(1) end
     end
 end)
 
@@ -709,7 +768,11 @@ end
 local function ViewerItemAuraDuration(item)
     if not (C_UnitAuras and C_UnitAuras.GetAuraDuration) then return end
     local id = item.GetAuraSpellInstanceID and item:GetAuraSpellInstanceID()
-    if ns.IsSecret(id) or not id then return end
+    if ns.IsSecret(id) then
+        secretAuraReads = secretAuraReads + 1
+        return
+    end
+    if not id then return end
     local unit = item.GetAuraDataUnit and item:GetAuraDataUnit() or "player"
     if ns.IsSecret(unit) then return end
     -- El aura puede haber terminado justo ahora: no cuenta como error
@@ -720,6 +783,7 @@ end
 -- Se llama al cambiar las opciones del borde dorado (y al cambiar de perfil)
 function ns.UpdateExpire()
     ns.RebuildExpireCurve()
+    lastPulse, idle = nil, false
     for owner, entry in pairs(tracked) do
         entry.errors, entry.disabled = 0, nil -- cualquier cambio vuelve a intentarlo
         LayoutExpire(entry, owner)
@@ -735,6 +799,7 @@ end
 function ns.CountExpireTracked() return trackedCount end
 function ns.CountExpireReads() return reads end
 function ns.IsExpireBroken() return not (C_CurveUtil and C_CurveUtil.CreateColorCurve) end
+function ns.CountHiddenBuffReads() return secretAuraReads end
 function ns.HasAuraDurationAPI() return (C_UnitAuras and C_UnitAuras.GetAuraDuration) ~= nil end
 
 ------------------------------------------------------------------------
@@ -785,7 +850,7 @@ function ns.SkinViewer(entry)
     if not db or not viewer then return end
     local on = db.enabled[entry.key]
     for _, item in ipairs(ItemFrames(viewer)) do
-        if on then SkinItem(item, db) else UnskinItem(item) end
+        if on then SkinItem(item, db, viewer) else UnskinItem(item, viewer) end
         if entry.cooldowns then LayoutKeybind(item, on and db.showKeybinds) end
         local tex = IconTexture(item)
         if entry.cooldowns and on and db.expireOnCDM and tex then
@@ -834,7 +899,9 @@ local function FlushPending()
     UpdateCDMFont()
     for entry in pairs(pending) do
         pending[entry] = nil
-        ns.SkinViewer(entry)
+        -- Un fallo en un visor no deja sin estilo a los demás de este repaso
+        local ok, err = pcall(ns.SkinViewer, entry)
+        if not ok then ns.ReportError(err) end
     end
 end
 
@@ -854,7 +921,7 @@ function ns.HookViewers()
         if viewer and not hookedViewers[viewer] then
             hookedViewers[viewer] = true
             local function queue() QueueSkin(entry) end
-            for _, method in ipairs({ "RefreshLayout", "Layout", "RefreshData" }) do
+            for _, method in ipairs({ "RefreshLayout", "Layout", "RefreshData", "SetTimerShown" }) do
                 if type(viewer[method]) == "function" then
                     hooksecurefunc(viewer, method, queue)
                 end

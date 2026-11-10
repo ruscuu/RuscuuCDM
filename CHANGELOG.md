@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.9.2
+
+Full review of the addon: 40 fixes and improvements.
+
+**New**
+- **Undo import**: a new button restores the profile as it was before the last import. Imports no longer bring in spells your character doesn't know.
+- Snapshots also save keybindings set directly on Bartender4, Dominos and ElvUI buttons, and on spells, macros and items.
+
+**Fixed**
+- Your Cooldown Manager swipe color, hidden swipe and swipe edge no longer go back to Blizzard's black swipe after every global cooldown or aura update. Blizzard's yellow "aura active" swipe is kept.
+- The addon respects Edit Mode's "Show Timer" setting for each Cooldown Manager viewer.
+- Turning off the style of a viewer brings back Blizzard's countdown font, size and color.
+- **Reset everything** no longer deletes your interface snapshots, and the confirmation says so. It also restores the game's countdown setting you had before the addon changed it, like **Leave the game setting** does now.
+- Deleting your class profile really switches back to Default; it no longer comes back after a reload.
+- **Effects**: the target and focus options work again on the current target frame. Hidden buffs and debuffs no longer block clicks or cancel a buff when you right-click near the minimap. Moving nameplate effects moves the main debuff row too, and also applies to the loss-of-control icon. BuffFrame or DebuffFrame hidden by name no longer come back on the next buff.
+- **Active cooldowns bar**: a spell whose cooldown ended during chained global cooldowns no longer stays on the bar after it is ready. Switching "Swipe edge" back to "Like Blizzard" removes the edge from trinkets and items. Empty buff placeholders no longer leave a gap.
+- **Threat meter**: no more possible errors in combat when the game hides threat data.
+- Keybinds also show for spells on Bartender4, Dominos or ElvUI bars that are hidden out of combat.
+- **Snapshots**: long names in Cyrillic or with accents survive export and import. Macros with the question-mark icon keep changing icon after a restore. Restoring bars from another class no longer empties your form or stealth bars. Cut-off import texts are rejected instead of half-imported, also for profiles.
+- An imported profile can no longer hide essential frames (the game world, the Esc menu, options, popups or chat).
+- The spell search ignores case and accents in every language.
+- An error in one startup step or one viewer no longer leaves the rest of the addon unstyled.
+
+**Performance**
+- Less CPU in combat: the golden border does nothing while its warnings are off, cooldown events are grouped into one update per frame, nameplate auras and the threat meter do less work in big pulls, and dragging the color picker no longer restyles everything twice.
+- Golden border frames are reused instead of created again.
+- Smaller download: an unused image is no longer packaged.
+
+**Other**
+- `/rcm debug` shows how many times the game hid a buff from addons, which explains when "Buffs about to end" can't show.
+- Releases run all the checks (luacheck, translations, tests) before publishing.
+
 ## v0.9.1
 
 **Fixed**
