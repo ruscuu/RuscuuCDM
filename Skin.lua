@@ -462,8 +462,13 @@ local function LayoutExpire(entry, owner)
 
     -- El brillo de Blizzard mide 62 px para un botón de 36: sobresale un 36% del icono por lado
     -- Se usa el lado corto: en las barras de buffs el borde puede rodear la barra entera
-    local size = math.min(entry.tex:GetWidth() or 0, entry.tex:GetHeight() or 0)
-    if not size or size <= 0 then size = 36 end
+    -- En combate el tamaño de los iconos de Blizzard puede llegar como valor secreto: no se puede operar con él
+    local w, h = entry.tex:GetWidth(), entry.tex:GetHeight()
+    if ns.IsSecret(w) or type(w) ~= "number" then w = nil end
+    if ns.IsSecret(h) or type(h) ~= "number" then h = nil end
+    local size = (w and h and math.min(w, h)) or w or h or 0
+    -- Sin tamaño legible se reutiliza el último conocido de este icono (o el de un botón normal)
+    if size <= 0 then size = entry.size or 36 else entry.size = size end
     local glow = math.floor(size * 0.36 * db.expireGlowSize / 100 + 0.5)
     entry.glow:ClearAllPoints()
     entry.glow:SetPoint("TOPLEFT", entry.tex, "TOPLEFT", -glow, glow)

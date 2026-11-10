@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.9.1
+
+**Fixed**
+- Error "attempt to perform numeric conversion on a secret number value" in combat: the golden border measured the Cooldown Manager icons, and the game hides their size in combat. It now keeps the last size it could read.
+
 ## v0.9.0
 
 **New**
